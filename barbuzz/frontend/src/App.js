@@ -7,6 +7,7 @@ import UserProfile from './components/UserProfile';
 import AuthForm from './components/AuthForm';
 import Navbar from './components/Navbar';
 import { useAuth } from './auth/AuthContext';
+import './index.css';
 
 // Protected route wrapper
 const ProtectedRoute = ({ children }) => {
