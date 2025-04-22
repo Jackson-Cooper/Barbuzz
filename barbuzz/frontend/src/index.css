@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-charcoal text-offWhite font-inter min-h-screen;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  @apply font-poppins font-semibold;
+}
+
+a {
+  @apply text-electricBlue hover:text-amber transition-colors;
+}
+
+button {
+  @apply rounded-xl font-poppins font-semibold transition-shadow;
+}
+
+.card {
+  @apply bg-slate bg-opacity-20 backdrop-blur-xs border border-white border-opacity-10 rounded-xl p-4;
+}
+
+.card:hover {
+  @apply shadow-lg;
+}
+
+.wait-time-short {
+  @apply bg-teal text-charcoal rounded-xl px-2 py-1 font-semibold;
+}
+
+.wait-time-medium {
+  @apply bg-electricBlue text-offWhite rounded-xl px-2 py-1 font-semibold;
+}
+
+.wait-time-long {
+  @apply bg-amber text-charcoal rounded-xl px-2 py-1 font-semibold;
+}
+
+.btn-primary {
+  @apply bg-electricBlue text-charcoal px-4 py-2 rounded-full hover:bg-opacity-90 transition-colors;
+}
+
+.btn-secondary {
+  @apply bg-transparent border-2 border-electricBlue text-electricBlue px-4 py-2 rounded-full hover:bg-electricBlue hover:bg-opacity-10 transition-colors;
+}
+
+.btn-danger {
+  @apply bg-magenta text-offWhite px-4 py-2 rounded-full hover:bg-opacity-90 transition-colors;
+}
+
+.input {
+  @apply bg-slate border border-white border-opacity-10 text-offWhite py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-electricBlue focus:border-transparent;
+}
+
+.glassmorphism {
+  @apply bg-white bg-opacity-5 backdrop-blur-xs border border-white border-opacity-10;
+}

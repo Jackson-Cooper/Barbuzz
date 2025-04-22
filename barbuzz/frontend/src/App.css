@@ -1,0 +1,9 @@
+/* Main application styles */
+.App {
+  font-family: sans-serif;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Add any additional global styles here */

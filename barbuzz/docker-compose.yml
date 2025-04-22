@@ -1,0 +1,65 @@
+networks:
+  app_network:
+    driver: bridge
+
+services:
+  frontend:
+    networks:
+      - app_network
+    container_name: frontend
+    build:
+      context: ./frontend/
+      dockerfile: Dockerfile
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - 3000:3000
+
+  backend:
+    container_name: backend
+    networks:
+      - app_network
+    build:
+      context: ./backend/
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend/backend:/code/backend/
+      - ../../allauth:/code/allauth
+    ports:
+      - "8000:8000"  # For production/Gunicorn
+      - "8001:8001"  # For development server
+    depends_on:
+      - db
+    
+  db:
+
+    image: postgres:15
+    container_name: db
+    restart: always
+    environment:
+      POSTGRES_DB: barbuzz
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+
+  proxy:
+    image: traefik:v3.0
+    container_name: proxy
+    ports:
+      - 10000:10000
+    volumes:
+      - ./traefik.toml:/etc/traefik/traefik.toml
+
+  mail:
+    container_name: mail
+    image: schickling/mailcatcher
+    ports:
+      - 1080:1080
+      - 1025:1025
+
+volumes:
+  postgres_data:
