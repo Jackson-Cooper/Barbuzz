@@ -20,6 +20,7 @@ urlpatterns = [
     path("users/", include("base_347_example.users.urls", namespace="users")),
     path("accounts/", include("allauth.urls")),
     # Your stuff: custom urls includes go here
+    # path("catalog/", include("base_347_example.catalog.urls")),  # Add this line for catalog
     path("chat/", include("base_347_example.chat.urls")),
     # ...
     # Media files
