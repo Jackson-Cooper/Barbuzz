@@ -13,7 +13,7 @@ from django.db.models.functions import Sin, Cos, ACos, Radians
 from rest_framework import viewsets, permissions, status, serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authtoken.models import Token
 
@@ -93,7 +93,30 @@ class BarViewSet(viewsets.ModelViewSet):
     """ViewSet for CRUD operations on bars"""
     queryset = Bar.objects.all()
     serializer_class = BarSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
+
+    @action(detail=False, methods=['get'], url_path='nearby-bars', permission_classes=[permissions.IsAuthenticated])
+    def get_nearby_bars(self, request):
+        """Get bars within a specified radius of a location"""
+
+        # Get location parameters
+        lat = request.query_params.get('lat')
+        lng = request.query_params.get('lng')
+        radius = request.query_params.get('radius')
+        limit = request.query_params.get('limit')
+
+        # google credentials for Google Places API
+        with open('api_keys.json') as f:
+            credentials = json.load(f)
+        places_api = build('places', 'v1', developerKey=credentials['google_api_key'])
+        request = places_api.nearbysearch(
+            location=f'{lat},{lng}',
+            radius=radius,
+            type='bar',
+        )
+        response = request.execute()
+        bars = response.get('results', [])
+        return Response(bars)
 
     def get_queryset(self):
         """
