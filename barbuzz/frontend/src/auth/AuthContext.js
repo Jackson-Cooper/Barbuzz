@@ -24,6 +24,8 @@ export function AuthProvider({ children }) {
           });
         } catch (err) {
           console.error('Failed to fetch user data', err);
+          localStorage.removeItem('token');
+          setIsAuthenticated(false);
         }
       };
       
@@ -61,17 +63,19 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // AuthContext.js
   const logout = async () => {
     try {
-      await apiLogout();
+      await apiLogout();        // may 401 if token was bad
+    } catch (err) {
+      console.warn('Logout endpoint returned error (likely bad token)', err);
+    } finally {
       setUser(null);
       setIsAuthenticated(false);
       localStorage.removeItem('token');
-    } catch (error) {
-      console.error('Logout failed:', error);
-      throw error;
     }
   };
+
 
   return (
     <AuthContext.Provider value={{ user, isAuthenticated, login, logout }}>

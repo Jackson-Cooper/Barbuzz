@@ -35,10 +35,11 @@ const HomePage = () => {
 
   // Load bars when location is available
   useEffect(() => {
+    if (!isAuthenticated) return;
     if (location) {
       loadBars();
     }
-  }, [location]);
+  }, [location, isAuthenticated]);
 
   const loadBars = async () => {
     try {

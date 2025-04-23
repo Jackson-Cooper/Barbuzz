@@ -12,8 +12,16 @@ const api = axios.create({
 
 // Add auth token to requests
 api.interceptors.request.use(config => {
+  // If this is our login or register or current-user endpoint, skip the token header:
+  if (
+    config.url.endsWith('/auth/login/') ||
+    config.url.endsWith('/auth/register/')
+    // config.url.endsWith('/auth/user/')
+  ) {
+    return config;
+  }
+
   const token = getAuthToken();
-  // const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Token ${token}`;
   }
