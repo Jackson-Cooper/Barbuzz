@@ -17,6 +17,7 @@ export function AuthProvider({ children }) {
       const fetchUserData = async () => {
         try {
           const userResponse = await getCurrentUser();
+          console.log('fetched user data:', userResponse.data);
           setUser({
             token,
             ...userResponse.data
@@ -32,8 +33,10 @@ export function AuthProvider({ children }) {
 
   const login = async (credentials) => {
     try {
+      console.log('login credentials:', credentials);
       const response = await apiLogin(credentials);
       const token = response.data.token;
+      console.log('login response:', response.data);
       
       // Store token first
       localStorage.setItem('token', token);

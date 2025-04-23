@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authtoken.models import Token
+from rest_framework.authtoken.views import ObtainAuthToken
 
 # Local imports
 from .models import Bar, Favorite, WaitTime, UserProfile
@@ -58,6 +59,16 @@ def get_current_user(request):
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
 
+class CustomAuthToken(ObtainAuthToken):
+    def post(self, request, *args, **kwargs):
+        serializer = self.serializer_class(data=request.data, context={'request': request})
+        if not serializer.is_valid():
+            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        user = serializer.validated_data['user']
+        token, created = Token.objects.get_or_create(user=user)
+        return Response({'token': token.key})
+
 class LogoutAPIView(APIView):
     """API endpoint for user logout"""
     permission_classes = [IsAuthenticated]
@@ -93,9 +104,9 @@ class BarViewSet(viewsets.ModelViewSet):
     """ViewSet for CRUD operations on bars"""
     queryset = Bar.objects.all()
     serializer_class = BarSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
-    @action(detail=False, methods=['get'], url_path='nearby-bars', permission_classes=[permissions.IsAuthenticated])
+    @action(detail=False, methods=['get'], url_path='get-nearby-bars', permission_classes=[permissions.IsAuthenticated])
     def get_nearby_bars(self, request):
         """Get bars within a specified radius of a location"""
 
@@ -116,6 +127,7 @@ class BarViewSet(viewsets.ModelViewSet):
         )
         response = request.execute()
         bars = response.get('results', [])
+        print(bars) # Debugging line to check the response
         return Response(bars)
 
     def get_queryset(self):
