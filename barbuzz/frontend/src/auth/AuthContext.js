@@ -17,12 +17,15 @@ export function AuthProvider({ children }) {
       const fetchUserData = async () => {
         try {
           const userResponse = await getCurrentUser();
+          console.log('fetched user data:', userResponse.data);
           setUser({
             token,
             ...userResponse.data
           });
         } catch (err) {
           console.error('Failed to fetch user data', err);
+          localStorage.removeItem('token');
+          setIsAuthenticated(false);
         }
       };
       
@@ -32,8 +35,10 @@ export function AuthProvider({ children }) {
 
   const login = async (credentials) => {
     try {
+      console.log('login credentials:', credentials);
       const response = await apiLogin(credentials);
       const token = response.data.token;
+      console.log('login response:', response.data);
       
       // Store token first
       localStorage.setItem('token', token);
@@ -58,17 +63,19 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // AuthContext.js
   const logout = async () => {
     try {
-      await apiLogout();
+      await apiLogout();        // may 401 if token was bad
+    } catch (err) {
+      console.warn('Logout endpoint returned error (likely bad token)', err);
+    } finally {
       setUser(null);
       setIsAuthenticated(false);
       localStorage.removeItem('token');
-    } catch (error) {
-      console.error('Logout failed:', error);
-      throw error;
     }
   };
+
 
   return (
     <AuthContext.Provider value={{ user, isAuthenticated, login, logout }}>

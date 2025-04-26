@@ -24,7 +24,7 @@ services:
       context: ./backend/
       dockerfile: Dockerfile
     volumes:
-      - ./backend/backend:/code/backend/
+      - ./backend:/app
       - ../../allauth:/code/allauth
     ports:
       - "8000:8000"  # For production/Gunicorn

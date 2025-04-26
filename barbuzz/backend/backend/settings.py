@@ -185,6 +185,7 @@ ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = False
 ACCOUNT_LOGIN_BY_CODE_ENABLED = True
 ACCOUNT_EMAIL_VERIFICATION_BY_CODE_ENABLED = True
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
+ACCOUNT_EMAIL_REQUIRED = True
 
 HEADLESS_ONLY = True
 HEADLESS_FRONTEND_URLS = {
@@ -201,15 +202,19 @@ MFA_PASSKEY_LOGIN_ENABLED = True
 MFA_PASSKEY_SIGNUP_ENABLED = True
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        #'allauth.rest_framework.authentication.AllAuthTokenAuthentication',
-        'rest_framework.authentication.TokenAuthentication', 
-    ),
+   'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+   ),
+   'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAdminUser', 
+   ),
 }
 SPECTACULAR_SETTINGS = {
     "EXTERNAL_DOCS": {"description": "allauth", "url": "/_allauth/openapi.html"},
 }
 
+GOOGLE_MAPS_API_KEY = "AIzaSyB_SDS1k2fox9lQ-7Yz2chEoKZ8tYMidcU"
 
 try:
     from .local_settings import *  # noqa

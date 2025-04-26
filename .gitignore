@@ -278,3 +278,6 @@ base_347_example/media/
 
 # don't commit .sqlite bc it has my canvas keys in it now.
 *.sqlite*
+
+# API keys
+api_keys.json
