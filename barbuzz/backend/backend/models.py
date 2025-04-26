@@ -18,9 +18,7 @@ class Bar(models.Model):
     photo_reference = models.CharField(max_length=255, blank=True, help_text="Reference token for retrieving a photo via Google Places API")
     price_level = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Price level from 0 (free) to 4 (very expensive)")
     rating = models.DecimalField(max_digits=3, decimal_places=2, null=True, blank=True, help_text="Average rating from Google (e.g., 4.3)")
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    type = models.CharField(max_length=50, default='bar')
 
     def __str__(self):
         return self.name

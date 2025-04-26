@@ -28,8 +28,34 @@ api.interceptors.request.use(config => {
   return config;
 });
 
-export const fetchBars = (params = {}) => {
-  return api.get('/bars/', { params });
+export const fetchBars = async (params = {}) => {
+  const token = localStorage.getItem('token');
+  
+  // Build URL with query parameters
+  const url = new URL('/api/bars/', API_BASE);
+  Object.keys(params).forEach(key => 
+    url.searchParams.append(key, params[key])
+  );
+  
+  console.log("Fetching from URL:", url.toString());
+
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': token ? `Token ${token}` : '',
+      'Content-Type': 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    // Handle authentication errors
+    if (response.status === 401) {
+      // Redirect to login or handle unauthenticated state
+      console.log("Authentication required");
+    }
+    throw new Error(`HTTP error! Status: ${response.status}`);
+  }
+  
+  return await response.json();
 };
 
 export const fetchWaitTimes = (barId) => {
@@ -56,18 +82,32 @@ export const fetchBar = (barId) => {
   return api.get(`/bars/${barId}/`);
 };
 
-export const submitWaitTime = (barId, minutes) => {
-  return api.post('/wait-times/', { bar: barId, minutes });
+export const getUserProfile = async () => {
+  try {
+    const response = await axios.get('/user-profiles/me/');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    throw error;
+  }
 };
 
-export const getUserProfile = () => {
-  return api.get('/user-profiles/me/');
+export const getUserFavorites = async () => {
+  try {
+    const response = await axios.get('/api/favorites/');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching favorites:', error);
+    throw error;
+  }
 };
 
-export const getFavorites = () => {
-  return api.get('/favorites/');
-};
-
-export const toggleFavorite = (barId) => {
-  return api.post(`/favorites/${barId}/toggle/`);
+export const toggleFavorite = async (barId) => {
+  try {
+    const response = await axios.post(`/api/favorites/${barId}/toggle/`);
+    return response.data;
+  } catch (error) {
+    console.error('Error toggling favorite:', error);
+    throw error;
+  }
 };

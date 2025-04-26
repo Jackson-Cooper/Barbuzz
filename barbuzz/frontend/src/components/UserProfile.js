@@ -1,95 +1,133 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { getUserProfile, getFavorites, toggleFavorite } from '../services/api';
+import { getUserProfile } from '../services/api';
 import { useAuth } from '../auth/AuthContext';
+import { useFavorites } from '../context/FavoritesContext';
+import BarCard from './BarCard';
 
 const UserProfile = () => {
   const [profile, setProfile] = useState(null);
-  const [favorites, setFavorites] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [error, setError] = useState(null);
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const { favorites, isLoading: loadingFavorites, refreshFavorites } = useFavorites();
 
+  // Load user profile data
   useEffect(() => {
-    const loadUserData = async () => {
+    const fetchData = async () => {
+      if (!isAuthenticated) return;
+      
       try {
-        setLoading(true);
-        // We need to implement these endpoints in the API
-        const profileResponse = await getUserProfile();
-        setProfile(profileResponse.data);
+        setLoadingProfile(true);
         
-        const favoritesResponse = await getFavorites();
-        setFavorites(favoritesResponse.data);
+        // Get profile data
+        const profileData = await getUserProfile();
+        setProfile(profileData);
         
+        // Clear any previous errors
         setError(null);
       } catch (err) {
-        console.error('Error loading user data:', err);
+        console.error('Error loading profile:', err);
         setError('Failed to load user profile data. Please try again.');
       } finally {
-        setLoading(false);
+        setLoadingProfile(false);
       }
     };
-
-    loadUserData();
-  }, []);
-
-  const handleToggleFavorite = async (barId) => {
-    try {
-      await toggleFavorite(barId);
-      // Refresh favorites
-      const favoritesResponse = await getFavorites();
-      setFavorites(favoritesResponse.data);
-    } catch (err) {
-      console.error('Error toggling favorite:', err);
-      setError('Failed to update favorites. Please try again.');
+    
+    fetchData();
+  }, [isAuthenticated]);
+  
+  // Refresh favorites when the profile page loads
+  useEffect(() => {
+    if (isAuthenticated) {
+      refreshFavorites();
     }
-  };
+  }, [isAuthenticated, refreshFavorites]);
 
-  if (loading) return <div className="loading">Loading profile...</div>;
-  if (error) return <div className="error">{error}</div>;
+  if (!isAuthenticated) {
+    return (
+      <div className="container mx-auto px-4 py-12">
+        <div className="bg-magenta bg-opacity-20 border border-magenta text-offWhite p-4 rounded-lg">
+          Please log in to view your profile.
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="user-profile">
-      <h1>My Profile</h1>
+    <div className="container mx-auto px-4 py-6">
+      <h1 className="text-3xl text-amber mb-6">Your Profile</h1>
       
-      <div className="profile-info">
-        <div className="profile-header">
-          <h2>{user?.username || 'User'}</h2>
-          <p>{user?.email || 'No email available'}</p>
+      {error && (
+        <div className="bg-magenta bg-opacity-20 border border-magenta text-offWhite p-4 rounded-lg mb-6">
+          {error}
         </div>
-        
-        {profile && (
-          <div className="profile-details">
-            <p>Member since: {new Date(profile.dateJoined).toLocaleDateString()}</p>
-            <p>Last active: {new Date(profile.lastActive).toLocaleDateString()}</p>
-          </div>
-        )}
-      </div>
+      )}
       
-      <div className="favorites-section">
-        <h2>My Favorite Bars</h2>
-        {favorites.length > 0 ? (
-          <div className="favorites-grid">
-            {favorites.map(bar => (
-              <div className="favorite-card" key={bar.id}>
-                <h3>{bar.name}</h3>
-                <p>{bar.address}</p>
-                <div className="favorite-actions">
-                  <Link to={`/bars/${bar.id}`} className="view-button">View Details</Link>
-                  <button 
-                    onClick={() => handleToggleFavorite(bar.id)}
-                    className="remove-favorite"
-                  >
-                    Remove
-                  </button>
-                </div>
+      {loadingProfile ? (
+        <div className="flex justify-center py-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber"></div>
+        </div>
+      ) : (
+        <>
+          {/* User Info */}
+          <div className="bg-slate bg-opacity-50 backdrop-blur-sm border border-white border-opacity-10 rounded-xl p-6 mb-8">
+            <div className="flex items-center gap-6">
+              {/* Profile image - use a placeholder or user's image */}
+              <div className="h-24 w-24 rounded-full bg-electricBlue flex items-center justify-center text-3xl text-charcoal font-bold">
+                {user?.username ? user.username[0].toUpperCase() : '?'}
               </div>
-            ))}
+              
+              <div>
+                <h2 className="text-2xl text-offWhite font-semibold">
+                  {user?.username || 'User'}
+                </h2>
+                <p className="text-offWhite text-opacity-70">
+                  {user?.email || 'No email provided'}
+                </p>
+                
+                {/* Show joined date if available */}
+                {profile?.date_joined && (
+                  <p className="text-sm text-electricBlue mt-2">
+                    Member since {new Date(profile.date_joined).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            {/* Additional user info if available */}
+            {profile?.bio && (
+              <div className="mt-4 border-t border-white border-opacity-10 pt-4">
+                <h3 className="text-lg text-amber mb-2">Bio</h3>
+                <p className="text-offWhite">{profile.bio}</p>
+              </div>
+            )}
           </div>
-        ) : (
-          <p>You haven't favorited any bars yet.</p>
-        )}
-      </div>
+          
+          {/* Favorite Bars */}
+          <div>
+            <h2 className="text-2xl text-amber mb-4">Your Favorite Bars</h2>
+            
+            {loadingFavorites ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-amber"></div>
+              </div>
+            ) : favorites.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {favorites.map(bar => (
+                  <BarCard key={bar.id} bar={bar} showDistance={false} />
+                ))}
+              </div>
+            ) : (
+              <div className="bg-slate bg-opacity-30 border border-white border-opacity-10 rounded-lg p-8 text-center">
+                <p className="text-offWhite text-opacity-80">You don't have any favorite bars yet.</p>
+                <p className="text-electricBlue mt-2">
+                  Click the heart icon on any bar card to add it to your favorites!
+                </p>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 };
