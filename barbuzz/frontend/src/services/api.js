@@ -105,7 +105,7 @@ export const getUserFavorites = async () => {
 
 export const toggleFavorite = async (barId) => {
   try {
-    const response = await axios.post(`/favorites/${barId}/toggle/`);
+    const response = await api.post(`/favorites/${barId}/toggle/`);
     return response.data;
   } catch (error) {
     console.error('Error toggling favorite:', error);
