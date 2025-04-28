@@ -214,7 +214,22 @@ SPECTACULAR_SETTINGS = {
     "EXTERNAL_DOCS": {"description": "allauth", "url": "/_allauth/openapi.html"},
 }
 
+# GOOGLE_MAPS_API_KEY = "AIzaSyDQsT_Mtp7MKyNpdOZyqecAJ6yex-8x35g"
 GOOGLE_MAPS_API_KEY = "AIzaSyB_SDS1k2fox9lQ-7Yz2chEoKZ8tYMidcU"
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,  # Keep Django's default logging too
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'DEBUG',  # or INFO for less spam
+    },
+}
 
 try:
     from .local_settings import *  # noqa
