@@ -3,6 +3,10 @@ API views for the BarBuzz application.
 Organized by function: Authentication, User Management, Bar Data, and Favorites.
 """
 
+#------------------------------------------------------
+# Imports
+import logging
+
 # Django imports
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
@@ -36,6 +40,9 @@ from googleapiclient.discovery import build
 import traceback
 from math import radians, sin, cos, sqrt, asin
 
+#------------------------------------------------------
+# Logging setup
+logger = logging.getLogger(__name__)
 #------------------------------------------------------
 # Authentication Views
 #------------------------------------------------------
@@ -134,6 +141,7 @@ class BarViewSet(viewsets.ModelViewSet):
                 # If not enough results, fetch new bars from Google Places API
                 if len(local_bars) < limit:
                     new_bars = self.fetch_new_bars_from_places(float(lat), float(lng), radius, limit - len(local_bars), gmaps)
+                    # logger.debug(f"Fetched {len(new_bars)} new bars from Google Places API")
                     local_bars.extend(new_bars)
                     
                     # Sort all bars by distance
@@ -228,7 +236,6 @@ class BarViewSet(viewsets.ModelViewSet):
                 radius=radius_meters,
                 type='bar'
             )
-            
             # Process and save new bars
             new_bars = []
             for place in places_result.get('results', [])[:limit*2]:  # Fetch extra to filter
@@ -276,13 +283,14 @@ class BarViewSet(viewsets.ModelViewSet):
                         phone_number=place_details.get('formatted_phone_number', ''),
                         website=place_details.get('website', ''),
                         hours=hours_data,
-                        is_open=is_open,
-                        photo_reference=photo_reference,
+                        # is_open=is_open, Fix Bar model to handle this
+                        photo_reference=photo_reference or '',
                         type='bar'
                     )
                     
                     # Save the new bar
                     bar.save()
+                    # logger.debug(f"Added new bar: {bar.name}")
                     
                     # Calculate and store distance
                     distance = self.haversine_distance(lat, lng, bar.latitude, bar.longitude)
@@ -296,12 +304,12 @@ class BarViewSet(viewsets.ModelViewSet):
                         break
                         
                 except Exception as e:
-                    print(f"Error processing place {place.get('name', 'unknown')}: {e}")
+                    logger.debug(f"Error processing place {place.get('name', 'unknown')}: {e}")
             
             return new_bars
             
         except Exception as e:
-            print(f"Error fetching places: {e}")
+            logger.debug(f"Error fetching places: {e}")
             return []
     
     def haversine_distance(self, lat1, lon1, lat2, lon2):

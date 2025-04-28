@@ -45,6 +45,7 @@ export const fetchBars = async (params = {}) => {
       'Content-Type': 'application/json'
     }
   });
+  console.log("Response data:", response);
 
   if (!response.ok) {
     // Handle authentication errors
@@ -84,7 +85,7 @@ export const fetchBar = (barId) => {
 
 export const getUserProfile = async () => {
   try {
-    const response = await axios.get('/user-profiles/me/');
+    const response = await api.get('/user-profiles/me/');
     return response.data;
   } catch (error) {
     console.error('Error fetching user profile:', error);
@@ -94,7 +95,7 @@ export const getUserProfile = async () => {
 
 export const getUserFavorites = async () => {
   try {
-    const response = await axios.get('/api/favorites/');
+    const response = await api.get('/favorites/');
     return response.data;
   } catch (error) {
     console.error('Error fetching favorites:', error);
@@ -104,7 +105,7 @@ export const getUserFavorites = async () => {
 
 export const toggleFavorite = async (barId) => {
   try {
-    const response = await axios.post(`/api/favorites/${barId}/toggle/`);
+    const response = await axios.post(`/favorites/${barId}/toggle/`);
     return response.data;
   } catch (error) {
     console.error('Error toggling favorite:', error);

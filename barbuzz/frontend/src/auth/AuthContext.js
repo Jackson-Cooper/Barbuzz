@@ -17,7 +17,6 @@ export function AuthProvider({ children }) {
       const fetchUserData = async () => {
         try {
           const userResponse = await getCurrentUser();
-          console.log('fetched user data:', userResponse.data);
           setUser({
             token,
             ...userResponse.data
