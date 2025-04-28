@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { FavoritesProvider } from './context/FavoritesContext';
+import AuthForm from './components/AuthForm';
 
 // Components
 import Navbar from './components/Navbar';
@@ -64,6 +65,8 @@ function App() {
                 <p className="text-offWhite">The page you are looking for doesn't exist.</p>
               </div>
             } />
+            <Route path="/login" element={<AuthForm mode="login" />} />
+            <Route path="/register" element={<AuthForm mode="register" />} />
           </Routes>
         </div>
       </FavoritesProvider>
