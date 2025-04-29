@@ -16,12 +16,11 @@ const Navbar = () => {
           </div>
           
           <div className="flex items-center space-x-4">
-            <Link to="/search" className="text-offWhite hover:text-electricBlue transition px-3 py-2">
-              Find Bars
-            </Link>
-            
             {isAuthenticated ? (
               <>
+                <Link to="/search" className="text-offWhite hover:text-electricBlue transition px-3 py-2">
+                  Search Bars
+                </Link>
                 <Link to="/profile" className="text-offWhite hover:text-electricBlue transition px-3 py-2">
                   My Profile
                 </Link>

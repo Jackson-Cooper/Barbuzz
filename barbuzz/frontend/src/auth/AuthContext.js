@@ -63,7 +63,7 @@ export function AuthProvider({ children }) {
   // AuthContext.js
   const logout = async () => {
     try {
-      await apiLogout();        // may 401 if token was bad
+      await apiLogout();      
     } catch (err) {
       console.warn('Logout endpoint returned error (likely bad token)', err);
     } finally {
