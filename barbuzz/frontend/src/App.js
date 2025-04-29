@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { FavoritesProvider } from './context/FavoritesContext';
 import AuthForm from './components/AuthForm';
+import { Navigate, useLocation } from 'react-router-dom';
 
 // Components
 import Navbar from './components/Navbar';
@@ -14,22 +15,18 @@ import BarSearch from './components/BarSearch';
 // Simple protected route component
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useAuth();
+  const location = useLocation();
   
   if (!isAuthenticated) {
-    return (
-      <div className="container mx-auto px-4 py-12 text-center">
-        <h1 className="text-3xl text-amber mb-4">Authentication Required</h1>
-        <p className="text-offWhite mb-4">You need to be logged in to access this page.</p>
-      </div>
-    );
+    // Redirect to login page if not authenticated
+    return <Navigate to="/login"/>;
   }
-  
+
   return children;
 };
 
 function App() {
   return (
-    // REMOVE the Router wrapper - it exists elsewhere
     <AuthProvider>
       <FavoritesProvider>
         <div className="min-h-screen bg-charcoal bg-gradient-to-br from-charcoal to-charcoal-dark text-offWhite">
