@@ -63,7 +63,9 @@ const BarCard = ({ bar, showDistance = true }) => {
     
     try {
       setIsToggling(true);
-      await toggleBarFavorite(bar.id);
+      console.log("Clicking favorite button"); // Debug
+      const success = await toggleBarFavorite(bar.id);
+      console.log("Toggle result:", success); // Debug
     } finally {
       setIsToggling(false);
     }

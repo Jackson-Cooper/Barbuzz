@@ -38,7 +38,6 @@ class WaitTime(models.Model):
 
 class UserProfile(models.Model):
     user = models.OneToOneField(get_user_model(), on_delete=models.CASCADE)
-    favorite_bars = models.ManyToManyField(Bar, blank=True)
 
     def __str__(self):
         return self.user.username
@@ -46,7 +45,6 @@ class UserProfile(models.Model):
 class Favorite(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorites')
     bar = models.ForeignKey(Bar, on_delete=models.CASCADE, related_name='favorited_by')
-    created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
         unique_together = ('user', 'bar')
