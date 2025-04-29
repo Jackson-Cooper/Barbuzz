@@ -4,44 +4,92 @@ import { useAuth } from '../auth/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
 import BarCard from './BarCard';
 
+// const UserProfile = () => {
+//   const [profile, setProfile] = useState(null);
+//   const [loadingProfile, setLoadingProfile] = useState(true);
+//   const [error, setError] = useState(null);
+//   const { user, isAuthenticated } = useAuth();
+//   const { favorites, isLoading: loadingFavorites, refreshFavorites } = useFavorites();
+
+//   // Load user profile data
+//   useEffect(() => {
+//     const fetchData = async () => {
+//       if (!isAuthenticated) return;
+      
+//       try {
+//         setLoadingProfile(true);
+        
+//         // Get profile data
+//         const profileData = await getUserProfile();
+//         setProfile(profileData);
+        
+//         // Clear any previous errors
+//         setError(null);
+//       } catch (err) {
+//         console.error('Error loading profile:', err);
+//         setError('Failed to load user profile data. Please try again.');
+//       } finally {
+//         setLoadingProfile(false);
+//       }
+//     };
+    
+//     fetchData();
+//   }, [isAuthenticated]);
+  
+//   // Refresh favorites when the profile page loads
+//   useEffect(() => {
+//     if (isAuthenticated) {
+//       refreshFavorites();
+//     }
+//   }, [isAuthenticated, refreshFavorites]);
 const UserProfile = () => {
   const [profile, setProfile] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setProfileError] = useState(null);
   const { user, isAuthenticated } = useAuth();
-  const { favorites, isLoading: loadingFavorites, refreshFavorites } = useFavorites();
-
-  // Load user profile data
+  const { favorites, isLoading: loadingFavorites, error: favoritesError } = useFavorites();
+  
+  // Count the number of renders for debugging
+  const [renderCount, setRenderCount] = useState(0);
   useEffect(() => {
-    const fetchData = async () => {
+    console.log("UserProfile rendered:", renderCount + 1);
+  });
+
+  // Load profile data - DON'T call refreshFavorites here
+  useEffect(() => {
+    let isMounted = true;
+    
+    const fetchProfile = async () => {
       if (!isAuthenticated) return;
       
       try {
         setLoadingProfile(true);
-        
-        // Get profile data
         const profileData = await getUserProfile();
-        setProfile(profileData);
         
-        // Clear any previous errors
-        setError(null);
+        // Only update state if component is still mounted
+        if (isMounted) {
+          setProfile(profileData);
+          setProfileError(null);
+        }
       } catch (err) {
         console.error('Error loading profile:', err);
-        setError('Failed to load user profile data. Please try again.');
+        if (isMounted) {
+          setProfileError('Failed to load user profile data.');
+        }
       } finally {
-        setLoadingProfile(false);
+        if (isMounted) {
+          setLoadingProfile(false);
+        }
       }
     };
     
-    fetchData();
+    fetchProfile();
+    
+    // Cleanup function to handle unmounting
+    return () => {
+      isMounted = false;
+    };
   }, [isAuthenticated]);
-  
-  // Refresh favorites when the profile page loads
-  useEffect(() => {
-    if (isAuthenticated) {
-      refreshFavorites();
-    }
-  }, [isAuthenticated, refreshFavorites]);
 
   if (!isAuthenticated) {
     return (

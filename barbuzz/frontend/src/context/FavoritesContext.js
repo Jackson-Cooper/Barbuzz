@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import { getUserFavorites, toggleFavorite } from '../services/api';
 import { useAuth } from '../auth/AuthContext';
 
@@ -9,19 +9,25 @@ export const FavoritesProvider = ({ children }) => {
   const [favoriteIds, setFavoriteIds] = useState(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const { isAuthenticated } = useAuth();
+  const [error, setError] = useState(null);
+  const activeRequest = useRef(false);
 
   // Load favorites when authenticated
   useEffect(() => {
+    // Only fetch when authenticated and no request is in progress
+    if (!isAuthenticated || activeRequest.current) return;
+    
     const loadFavorites = async () => {
-      if (!isAuthenticated) {
-        setFavorites([]);
-        setFavoriteIds(new Set());
-        return;
-      }
+      // Prevent duplicate requests
+      if (activeRequest.current) return;
       
       try {
         setIsLoading(true);
+        activeRequest.current = true;
+        setError(null);
+        
         const data = await getUserFavorites();
+        console.log("Loaded favorites:", data); // Debug log
         
         if (Array.isArray(data)) {
           setFavorites(data);
@@ -30,8 +36,10 @@ export const FavoritesProvider = ({ children }) => {
         }
       } catch (error) {
         console.error('Failed to load favorites:', error);
+        setError('Failed to load favorites');
       } finally {
         setIsLoading(false);
+        activeRequest.current = false;
       }
     };
     
@@ -43,27 +51,35 @@ export const FavoritesProvider = ({ children }) => {
     return favoriteIds.has(barId);
   };
 
-  // Function to toggle a favorite
+  // Function to toggle a favorite with debug logging
   const toggleBarFavorite = async (barId) => {
     if (!isAuthenticated) return false;
     
     try {
+      console.log(`Toggling favorite for bar ID ${barId}`); // Debug log
       const response = await toggleFavorite(barId);
+      console.log("Toggle response:", response); // Debug log
       
       // Update local state based on response
       if (response.status === 'added') {
-        // If we have the bar details, add it to favorites
-        setFavoriteIds(prev => new Set([...prev, barId]));
-      } else {
-        // Remove from favorites
+        console.log(`Adding bar ${barId} to favorites`); // Debug log
         setFavoriteIds(prev => {
-          const newSet = new Set([...prev]);
+          const newSet = new Set(prev);
+          newSet.add(barId);
+          return newSet;
+        });
+      } else if (response.status === 'removed') {
+        console.log(`Removing bar ${barId} from favorites`); // Debug log
+        setFavoriteIds(prev => {
+          const newSet = new Set(prev);
           newSet.delete(barId);
           return newSet;
         });
       }
       
-      // Return true if the operation was successful
+      // Refresh the full favorites list to ensure consistency
+      refreshFavorites();
+      
       return true;
     } catch (error) {
       console.error('Error toggling favorite:', error);
@@ -71,10 +87,15 @@ export const FavoritesProvider = ({ children }) => {
     }
   };
 
-  // Refresh favorites manually (useful after toggling)
+  // Refresh favorites manually with safeguards
   const refreshFavorites = async () => {
+    // Don't refresh if not authenticated, already loading, or have an active request
+    if (!isAuthenticated || isLoading || activeRequest.current) return;
+
     try {
       setIsLoading(true);
+      activeRequest.current = true;
+      
       const data = await getUserFavorites();
       
       if (Array.isArray(data)) {
@@ -85,6 +106,7 @@ export const FavoritesProvider = ({ children }) => {
       console.error('Failed to refresh favorites:', error);
     } finally {
       setIsLoading(false);
+      activeRequest.current = false;
     }
   };
 
@@ -94,7 +116,8 @@ export const FavoritesProvider = ({ children }) => {
       isFavorite, 
       toggleBarFavorite, 
       refreshFavorites,
-      isLoading
+      isLoading,
+      error
     }}>
       {children}
     </FavoritesContext.Provider>

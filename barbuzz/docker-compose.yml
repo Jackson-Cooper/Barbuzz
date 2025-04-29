@@ -31,6 +31,8 @@ services:
       - "8001:8001"  # For development server
     depends_on:
       - db
+    # Allows to bypass automatic migrations
+    #command: bash -c "sleep infinity"
     
   db:
 

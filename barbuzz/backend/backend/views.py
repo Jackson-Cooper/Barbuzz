@@ -339,12 +339,23 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_favorites(request):
-    """Get all favorite bars for the current user"""
-    favorites = Favorite.objects.filter(user=request.user)
-    bars = [favorite.bar for favorite in favorites]
-    serializer = BarSerializer(bars, many=True)
-    return Response(serializer.data)
-
+    """
+    Get all favorite bars for the current user.
+    Returns serialized bar data for favorited bars.
+    """
+    try:
+        favorites = Favorite.objects.filter(user=request.user)
+        favorite_bars = [favorite.bar for favorite in favorites]
+        serializer = BarSerializer(favorite_bars, many=True)
+        return Response(serializer.data)
+    
+    except Exception as e:
+        logging.error(f"Error fetching favorites: {str(e)}")
+        return Response(
+            {"error": "Failed to load favorites."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def toggle_favorite(request, bar_id):

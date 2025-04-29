@@ -108,7 +108,7 @@ export const toggleFavorite = async (barId) => {
     const response = await api.post(`/favorites/${barId}/toggle/`);
     return response.data;
   } catch (error) {
-    console.error('Error toggling favorite:', error);
+    console.error(`Error toggling favorite for bar ${barId}:`, error);
     throw error;
   }
 };
