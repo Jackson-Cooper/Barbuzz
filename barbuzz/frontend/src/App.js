@@ -38,7 +38,7 @@ function App() {
               </ProtectedRoute>
             } />
             
-            <Route path="/bars/:id" element={
+            <Route path="/bars/:barId" element={
               <ProtectedRoute>
                 <BarDetail />
               </ProtectedRoute>
