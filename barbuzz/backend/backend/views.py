@@ -36,7 +36,7 @@ from .serializers import (
 # API imports
 import json
 import googlemaps
-from googleapiclient.discovery import build
+import requests
 import traceback
 from math import radians, sin, cos, sqrt, asin
 
@@ -331,6 +331,80 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
     serializer_class = WaitTimeSerializer
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Override list method to fetch wait times from the external "best time" API
+        and return them in the response.
+        """
+        bar_id = request.query_params.get('bar')
+        if not bar_id:
+            return Response({"error": "Bar ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Fetch the bar instance by ID
+            bar = Bar.objects.get(pk=bar_id)
+        except Bar.DoesNotExist:
+            return Response({"error": "Bar not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # TODO: Implement the actual call to the "best time" API here
+        try:
+            wait_time_data = {
+                "bar": {
+                    "id": bar_id,
+                    "name": bar.name,
+                    "address": bar.address
+                },
+            }
+
+            venue_id = self.create_besttime_forecast(bar)
+            wait_time_data['venue_id'] = venue_id
+            # wait_time_data['current_wait_time'] = self.fetch_current_busyness_pct(wait_time_data['venue_id'])
+
+            logger.debug(f"Wait time data: {wait_time_data}")
+
+            return Response([wait_time_data], status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+    def create_besttime_forecast(self, bar):
+        """
+        Create a new forecast for the given bar using the "best time" API and
+        return the new venue ID.
+        
+        :param bar: The Bar instance to create a forecast for
+        :return: The venue ID returned by the "best time" API
+        """
+        url = "https://besttime.app/api/v1/forecasts"
+        resp = requests.post(url, params={
+            'api_key_private': settings.BEST_TIME_API_KEY_PRIVATE,
+            'venue_name':    bar.name,
+            'venue_address': bar.address,
+        })
+        resp.raise_for_status()
+        data = resp.json()
+        return data['venue_info']['venue_id']
+    
+    def fetch_current_busyness_pct(self, venue_id):
+        """
+        Fetch the current busyness percentage for a given venue using the "best time" API.
+
+        :param venue_id: The ID of the venue for which to fetch the current busyness percentage.
+        :return: An integer representing the current busyness percentage (0-100).
+        :raises: HTTPError if the request to the API fails.
+        """
+        logger.debug(f"Fetching current busyness for venue {venue_id}")
+        url = "https://besttime.app/api/v1/forecasts/now/raw"
+        resp = requests.get(url, params={
+            'api_key_public': settings.BEST_TIME_API_KEY_PRIVATE,
+            'venue_id':       venue_id,
+        })
+        resp.raise_for_status()
+        logger.debug(f"Best time API response: {resp.json()}")
+        return resp.json()['analysis']['hour_raw']   # e.g. 0–100
+
+
+    
 
 #------------------------------------------------------
 # Favorites Views
