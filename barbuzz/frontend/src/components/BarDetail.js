@@ -53,7 +53,7 @@ const BarDetail = () => {
         <h2>Current Wait Time</h2>
         <div className="current-wait">
           {waitTimes.length > 0 ? (
-            <span className="minutes">{waitTimes[0].minutes} minutes</span>
+            <span className="minutes">{waitTimes[0]} minutes</span>
           ) : (
             <span>No wait times available</span>
           )}
