@@ -359,11 +359,12 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
 
             venue_id = self.create_besttime_forecast(bar)
             wait_time_data['venue_id'] = venue_id
-            # wait_time_data['current_wait_time'] = self.fetch_current_busyness_pct(wait_time_data['venue_id'])
+            hour_raw = self.fetch_current_busyness_pct(wait_time_data['venue_id'])
+            wait_time_data['current_wait_time'] = self.pct_to_minutes(hour_raw)
 
             logger.debug(f"Wait time data: {wait_time_data}")
 
-            return Response([wait_time_data], status=status.HTTP_200_OK)
+            return Response([wait_time_data['current_wait_time']], status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
@@ -393,15 +394,18 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
         :return: An integer representing the current busyness percentage (0-100).
         :raises: HTTPError if the request to the API fails.
         """
-        logger.debug(f"Fetching current busyness for venue {venue_id}")
         url = "https://besttime.app/api/v1/forecasts/now/raw"
         resp = requests.get(url, params={
-            'api_key_public': settings.BEST_TIME_API_KEY_PRIVATE,
+            'api_key_public': settings.BEST_TIME_API_KEY_PUBLIC,
             'venue_id':       venue_id,
         })
         resp.raise_for_status()
-        logger.debug(f"Best time API response: {resp.json()}")
         return resp.json()['analysis']['hour_raw']   # e.g. 0–100
+    
+    @staticmethod
+    def pct_to_minutes(pct, max_wait=60):
+        return round(pct/100 * max_wait)
+
 
 
     
