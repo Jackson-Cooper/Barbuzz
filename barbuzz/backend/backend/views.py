@@ -316,6 +316,12 @@ class BarViewSet(viewsets.ModelViewSet):
             phone = place_details.get('formatted_phone_number', '')
             website = place_details.get('website', '')
             
+            # Get photo reference
+            photo_reference = None
+            photos = place_details.get('photos', [])
+            if photos and isinstance(photos, list):
+                photo_reference = photos[0].get('photo_reference')
+            
             # Get operating hours
             hours_data = place_details.get('opening_hours', {}).get('periods', [])
             if hours_data:
@@ -356,6 +362,7 @@ class BarViewSet(viewsets.ModelViewSet):
                 longitude=longitude,
                 phone_number=phone,
                 website=website,
+                photo_reference=photo_reference,
                 hours=hours,
                 price_level=price_level,
                 rating=rating,
