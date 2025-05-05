@@ -345,8 +345,7 @@ class BarViewSet(viewsets.ModelViewSet):
                 hours = json.dumps(cleaned_hours) 
             else:
                 hours = None
-            
-            # Get price level and rating if available
+
             price_level = place_details.get('price_level')
             rating = place_details.get('rating')
             
@@ -461,7 +460,6 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
         except Bar.DoesNotExist:
             return Response({"error": "Bar not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # TODO: Implement the actual call to the "best time" API here
         try:
             wait_time_data = {
                 "bar": {
@@ -476,7 +474,7 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
             hour_raw = self.fetch_current_busyness_pct(wait_time_data['venue_id'])
             wait_time_data['current_wait_time'] = self.pct_to_minutes(hour_raw)
 
-            logger.debug(f"Wait time data: {wait_time_data}")
+            # logger.debug(f"Wait time data: {wait_time_data}")
 
             return Response([wait_time_data['current_wait_time']], status=status.HTTP_200_OK)
         except Exception as e:

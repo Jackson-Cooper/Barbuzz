@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { fetchBar, fetchWaitTimes } from '../services/api';
 import { useAuth } from '../auth/AuthContext';
+import { groupHours } from './HoursFormat';
 
 const BarDetail = () => {
   const { barId } = useParams();
@@ -37,6 +38,7 @@ const BarDetail = () => {
   if (error) return <div className="text-center text-red-500 py-10">{error}</div>;
   if (!bar) return <div className="text-center text-gray-300 py-10">Bar not found</div>;
 
+  const formattedHours = groupHours(bar.hours);
   const imageUrl = bar.photo_reference
     ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${bar.photo_reference}&key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}`
     : null;
@@ -69,8 +71,14 @@ const BarDetail = () => {
         </div>
         <div className="mb-2"><strong>Phone:</strong> {bar.phone_number || 'N/A'}</div>
         <div className="mb-2">
-          <strong>Hours:</strong> {bar.hours}
+          <strong>Hours:</strong>
+          <ul className="list-disc list-inside ml-4 text-gray-300">
+            {formattedHours.map((line, index) => (
+              <li key={index}>{line}</li>
+            ))}
+          </ul>
         </div>
+
         <div className="mb-4">{bar.description}</div>
       </div>
       
