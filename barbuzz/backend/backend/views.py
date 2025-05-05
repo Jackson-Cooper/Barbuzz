@@ -15,6 +15,7 @@ from django.contrib.auth import authenticate
 from django.db.models import F, ExpressionWrapper, FloatField
 from django.db.models.functions import Sin, Cos, ACos, Radians
 from django.db.models import Q
+from django.shortcuts import get_object_or_404
 
 # REST Framework imports
 from django.conf import settings
@@ -115,7 +116,7 @@ class UserProfileViewSet(viewsets.ReadOnlyModelViewSet):
 #------------------------------------------------------
 # Bar and Wait Time Views
 #------------------------------------------------------
-
+        
 class BarViewSet(viewsets.ModelViewSet):
     queryset = Bar.objects.all()
     serializer_class = BarSerializer
@@ -513,9 +514,6 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
     def pct_to_minutes(pct, max_wait=60):
         return round(pct/100 * max_wait)
 
-
-
-    
 
 #------------------------------------------------------
 # Favorites Views

@@ -137,22 +137,6 @@ const BarSearch = () => {
     setFilteredBars(filtered);
   };
 
-  // Function to get a bar image
-  const getBarImage = (bar) => {
-    if (bar.image) return bar.image;
-    
-    const barImages = [
-      'https://images.unsplash.com/photo-1514933651103-005eec06c04b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1572116469696-31de0f17cc34?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1470337458703-46ad1756a187?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-    ];
-    
-    // Use bar ID to consistently get the same image for a specific bar
-    const index = bar.id ? bar.id % barImages.length : 0;
-    return barImages[index];
-  };
-
   if (!isAuthenticated) {
     return (
       <div className="text-center p-8">
@@ -276,7 +260,7 @@ const BarSearch = () => {
             <BarCard 
               key={bar.id} 
               bar={bar} 
-              image={getBarImage(bar)}
+              image={(bar.image)}
               showDistance={Boolean(userLocation && bar.distance)} 
             />
           ))}
