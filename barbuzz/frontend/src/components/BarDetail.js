@@ -44,7 +44,7 @@ const BarDetail = () => {
     : null;
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-black rounded shadow-md text-center">
+    <div className="max-w-4xl mx-auto p-6 bg-charcoal rounded shadow-md text-center">
       {imageUrl && (
         <div className="flex justify-center mb-6">
           <img
@@ -56,40 +56,41 @@ const BarDetail = () => {
       )}
       <h1 className="text-3xl font-bold mb-4 text-white">{bar.name}</h1>
       
-      <div className="mb-6 text-gray-300">
-        <div className="mb-2"><strong>Address:</strong> {bar.address}</div>
-        <div className="mb-2"><strong>Rating:</strong> {bar.rating || 'N/A'}</div>
-        <div className="mb-2">
-          <strong>Website:</strong>{' '}
-          {bar.website ? (
-            <a href={bar.website} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-400">
-              Website
-            </a>
-          ) : (
-            'N/A'
-          )}
-        </div>
-        <div className="mb-2"><strong>Phone:</strong> {bar.phone_number || 'N/A'}</div>
-        <div className="mb-2">
-          <strong>Hours:</strong>
-          <ul className="list-disc list-inside ml-4 text-gray-300">
-            {formattedHours.map((line, index) => (
-              <li key={index}>{line}</li>
-            ))}
-          </ul>
-        </div>
+      <div className="flex justify-between items-center mb-6 text-gray-300">
+        <div className="max-w-3xl">
+          <div className="mb-2"><strong>Address:</strong> {bar.address}</div>
+          <div className="mb-2"><strong>Rating:</strong> {bar.rating || 'N/A'}</div>
+          <div className="mb-2">
+            {bar.website ? (
+              <a href={bar.website} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-400">
+                Visit Website
+              </a>
+            ) : (
+              'N/A'
+            )} 
+          </div>
+          <div className="mb-2"><strong>Phone:</strong> {bar.phone_number || 'N/A'}</div>
+          <div className="mb-2">
+            <strong>Hours:</strong>
+            <ul className="list-disc list-inside ml-4 text-gray-300">
+              {formattedHours.map((line, index) => (
+                <li key={index}>{line}</li>
+              ))}
+            </ul>
+          </div>
 
-        <div className="mb-4">{bar.description}</div>
-      </div>
-      
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold mb-2 text-white">Current Wait Time</h2>
-        <div className="text-xl font-medium text-green-400">
-          {waitTimes.length > 0 ? (
-            <span>{waitTimes[0]} minutes</span>
-          ) : (
-            <span>No wait times available</span>
-          )}
+          <div className="mb-4">{bar.description}</div>
+        </div>
+        
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold mb-2 text-white">Current Wait Time</h2>
+          <div className="text-xl font-medium text-green-400">
+            {waitTimes.length > 0 ? (
+              <span>{waitTimes[0]} minutes</span>
+            ) : (
+              <span>No wait times available</span>
+            )}
+          </div>
         </div>
       </div>
       
