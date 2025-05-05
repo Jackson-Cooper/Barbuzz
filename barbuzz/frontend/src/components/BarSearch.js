@@ -3,19 +3,23 @@ import { Link } from 'react-router-dom';
 import { fetchBars } from '../services/api';
 import { useAuth } from '../auth/AuthContext';
 import BarCard from './BarCard';
+import { isCurrentlyOpen } from '../utils/barUtils';
 
 const BarSearch = () => {
-  const [searchResults, setSearchResults] = useState([]);
+  const [bars, setBars] = useState([]);
+  const [filteredBars, setFilteredBars] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [location, setLocation] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const { isAuthenticated } = useAuth();
+  const [userLocation, setUserLocation] = useState(null);
   
-  // Restore filter state
+  // Filter state variables
   const [priceFilter, setPriceFilter] = useState(0); // 0 = all, 1-4 = price levels
   const [ratingFilter, setRatingFilter] = useState(0); // 0 = all, 1-5 = minimum rating
   const [openNowFilter, setOpenNowFilter] = useState(false);
+  const [isGlobalSearch, setIsGlobalSearch] = useState(false);
 
   useEffect(() => {
     // Get user's location
@@ -42,104 +46,96 @@ const BarSearch = () => {
     }
   }, [isAuthenticated, location]);
 
+  // Apply filters whenever bars or filters change
+  useEffect(() => {
+    applyFilters();
+  }, [bars, priceFilter, ratingFilter, openNowFilter, searchTerm]);
+
   const loadAllBars = async () => {
     try {
       setLoading(true);
-      const params = location ? {
+      const params = {
         lat: location.lat,
         lng: location.lng,
-        radius: 20,  // Larger radius for search
-        limit: 50    // More results for search
-      } : {};
+        radius: 10, // Default radius in miles
+        limit: 20
+      };
       
-      const response = await fetchBars(params);
-      
-      // Handle all possible response formats
-      if (Array.isArray(response)) {
-        // API returned array directly
-        setSearchResults(response);
-      } else if (response && Array.isArray(response.data)) {
-        // API returned {data: [...]}
-        setSearchResults(response.data);
-      } else if (response && response.data && Array.isArray(response.data.data)) {
-        // API returned {data: {data: [...]}}
-        setSearchResults(response.data.data);
-      } else {
-        console.log("API response:", response);
-        setSearchResults([]); // Empty array on unexpected format
-      }
-      
+      const data = await fetchBars(params);
+      setBars(data);
       setError(null);
     } catch (err) {
-      console.error('Error fetching bars:', err);
-      setError('Failed to load bars. Please try again later.');
-      setSearchResults([]);
+      console.error('Error loading bars:', err);
+      setError('Could not load bars. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Check if a bar is currently open based on hours data
-  const isCurrentlyOpen = (hoursArray) => {
-    if (!hoursArray || !Array.isArray(hoursArray) || hoursArray.length < 7) {
-      return undefined;
+  // New function to search bars globally
+  const searchBars = async (e) => {
+    e.preventDefault();
+    if (!searchTerm.trim()) {
+      return loadAllBars();
     }
     
-    // Get current day and time
-    const now = new Date();
-    const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const currentDay = daysOfWeek[now.getDay()];
-    
-    // Find today's hours string
-    const todayHours = hoursArray.find(hourString => 
-      hourString.startsWith(currentDay)
-    );
-    
-    // If no hours for today or explicitly closed
-    if (!todayHours || todayHours.includes('Closed')) {
-      return false;
+    try {
+      setLoading(true);
+      setIsGlobalSearch(true);
+      
+      const params = {
+        query: searchTerm,
+        global: true,
+        limit: 20
+      };
+      
+      const data = await fetchBars(params);
+      setBars(data);
+      setError(null);
+    } catch (err) {
+      console.error('Error searching bars:', err);
+      setError('Could not find bars. Please try a different search.');
+    } finally {
+      setLoading(false);
     }
-    
-    // For simplicity, assume open if hours are listed for today
-    // A more accurate version would parse the actual hours
-    return true;
   };
 
-  // Filter bars based on search term and filters
-  const filteredBars = searchResults && Array.isArray(searchResults) 
-    ? searchResults.filter(bar => {
-        // Name filter
-        if (bar && bar.name && !bar.name.toLowerCase().includes(searchTerm.toLowerCase())) {
-          return false;
-        }
-        
-        // Price filter
-        if (priceFilter > 0 && (!bar.price_level || bar.price_level !== priceFilter)) {
-          return false;
-        }
-        
-        // Rating filter (convert string ratings to numbers)
-        if (ratingFilter > 0) {
-          const numRating = bar.rating ? parseFloat(bar.rating) : 0;
-          if (numRating < ratingFilter) {
-            return false;
-          }
-        }
-        
-        // Open now filter
-        if (openNowFilter) {
-          const isOpen = bar.is_open !== undefined 
-            ? bar.is_open 
-            : isCurrentlyOpen(bar.hours);
-          
-          if (isOpen !== true) {
-            return false;
-          }
-        }
-        
-        return true;
-      })
-    : [];
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const handlePriceFilterChange = (level) => {
+    setPriceFilter(priceFilter === level ? 0 : level);
+  };
+
+  const handleRatingFilterChange = (rating) => {
+    setRatingFilter(ratingFilter === rating ? 0 : rating);
+  };
+
+  const handleOpenNowFilterChange = () => {
+    setOpenNowFilter(!openNowFilter);
+  };
+  
+  const applyFilters = () => {
+    let filtered = [...bars];
+    
+    // Price filter
+    if (priceFilter > 0) {
+      filtered = filtered.filter(bar => bar.price_level === priceFilter);
+    }
+    
+    // Rating filter
+    if (ratingFilter > 0) {
+      filtered = filtered.filter(bar => bar.rating >= ratingFilter);
+    }
+    
+    // Open now filter - use the shared utility
+    if (openNowFilter) {
+      filtered = filtered.filter(bar => isCurrentlyOpen(bar.hours));
+    }
+    
+    setFilteredBars(filtered);
+  };
 
   // Function to get a bar image
   const getBarImage = (bar) => {
@@ -147,135 +143,152 @@ const BarSearch = () => {
     
     const barImages = [
       'https://images.unsplash.com/photo-1514933651103-005eec06c04b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1543007630-9710e4a00a20?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1470337458703-46ad1756a187?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1510626176961-4b57d4fbad03?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1575444758702-4a6b9222336e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1572116469696-31de0f17cc34?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1470337458703-46ad1756a187?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
     ];
     
+    // Use bar ID to consistently get the same image for a specific bar
     const index = bar.id ? bar.id % barImages.length : 0;
     return barImages[index];
   };
 
-  // Reset all filters
-  const resetFilters = () => {
-    setPriceFilter(0);
-    setRatingFilter(0);
-    setOpenNowFilter(false);
-  };
+  if (!isAuthenticated) {
+    return (
+      <div className="text-center p-8">
+        <p className="text-lg">You need to be logged in to search for bars.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      <h1 className="text-3xl text-amber mb-4">Search Bars</h1>
-      
-      {/* Search input */}
-      <div className="mb-6">
-        <input
-          type="text"
-          placeholder="Search for bars by name..."
-          className="w-full p-3 bg-slate border border-white border-opacity-10 rounded-lg text-offWhite focus:outline-none focus:ring-2 focus:ring-electricBlue"
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-        />
-      </div>
-      
-      {/* Filter options */}
-      <div className="mb-6 flex flex-wrap gap-4">
-        {/* Price filter */}
-        <div className="flex items-center gap-2">
-          <span className="text-offWhite text-sm">Price:</span>
+    <div className="container mx-auto px-4 py-8">
+      <div className="bg-slate rounded-lg p-6 mb-8">
+        <h1 className="text-2xl font-bold text-amber mb-4">Find Bars</h1>
+        
+        {/* Search bar - enhanced to support global search */}
+        <form onSubmit={searchBars} className="mb-4">
           <div className="flex">
-            {[0, 1, 2, 3, 4].map(price => (
-              <button
-                key={`price-${price}`}
-                className={`px-3 py-1 text-sm ${
-                  priceFilter === price 
-                    ? 'bg-electricBlue text-charcoal' 
-                    : 'bg-slate text-offWhite'
-                } rounded-md mr-1`}
-                onClick={() => setPriceFilter(price)}
-              >
-                {price === 0 ? 'All' : '$'.repeat(price)}
-              </button>
-            ))}
+            <input
+              type="text"
+              placeholder="Search for any bar by name or location..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              className="w-full p-3 bg-charcoal border border-slate-600 rounded-l-lg text-offWhite focus:outline-none focus:ring-2 focus:ring-electricBlue"
+            />
+            <button
+              type="submit"
+              className="bg-amber text-charcoal px-4 py-2 rounded-r-lg hover:bg-amber-600"
+            >
+              Search
+            </button>
+          </div>
+        </form>
+        
+        {/* Filters Section */}
+        <div>
+          <h2 className="text-lg font-semibold text-amber mb-2">Filters</h2>
+          
+          {/* Price Filter */}
+          <div className="mb-3">
+            <label className="block text-offWhite text-sm mb-1">Price Level</label>
+            <div className="flex space-x-2">
+              {[1, 2, 3, 4].map(level => (
+                <button
+                  key={`price-${level}`}
+                  onClick={() => handlePriceFilterChange(level)}
+                  className={`px-3 py-1 rounded-md ${
+                    priceFilter === level
+                      ? 'bg-amber text-charcoal'
+                      : 'bg-charcoal text-offWhite hover:bg-slate-700'
+                  }`}
+                >
+                  {'$'.repeat(level)}
+                </button>
+              ))}
+              {priceFilter > 0 && (
+                <button
+                  onClick={() => setPriceFilter(0)}
+                  className="px-3 py-1 rounded-md bg-magenta text-offWhite hover:bg-magenta-600"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+          
+          {/* Rating Filter */}
+          <div className="mb-3">
+            <label className="block text-offWhite text-sm mb-1">Minimum Rating</label>
+            <div className="flex space-x-2">
+              {[2.5, 3, 3.5, 4, 4.5].map(rating => (
+                <button
+                  key={`rating-${rating}`}
+                  onClick={() => handleRatingFilterChange(rating)}
+                  className={`px-3 py-1 rounded-md ${
+                    ratingFilter === rating
+                      ? 'bg-amber text-charcoal'
+                      : 'bg-charcoal text-offWhite hover:bg-slate-700'
+                  }`}
+                >
+                  {rating}⭐
+                </button>
+              ))}
+              {ratingFilter > 0 && (
+                <button
+                  onClick={() => setRatingFilter(0)}
+                  className="px-3 py-1 rounded-md bg-magenta text-offWhite hover:bg-magenta-600"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+          
+          {/* Open Now Filter */}
+          <div>
+            <label className="inline-flex items-center">
+              <input
+                type="checkbox"
+                checked={openNowFilter}
+                onChange={handleOpenNowFilterChange}
+                className="form-checkbox h-5 w-5 text-amber rounded focus:ring-amber"
+              />
+              <span className="ml-2 text-offWhite text-sm">Open Now</span>
+            </label>
           </div>
         </div>
-        
-        {/* Rating filter */}
-        <div className="flex items-center gap-2">
-          <span className="text-offWhite text-sm">Rating:</span>
-          <div className="flex">
-            {[0, 3, 3.5, 4, 4.5].map(rating => (
-              <button
-                key={`rating-${rating}`}
-                className={`px-3 py-1 text-sm ${
-                  ratingFilter === rating 
-                    ? 'bg-electricBlue text-charcoal' 
-                    : 'bg-slate text-offWhite'
-                } rounded-md mr-1`}
-                onClick={() => setRatingFilter(rating)}
-              >
-                {rating === 0 ? 'All' : `${rating}+`}
-              </button>
-            ))}
-          </div>
-        </div>
-        
-        {/* Open now filter */}
-        <button
-          className={`px-4 py-1 text-sm rounded-md ${
-            openNowFilter 
-              ? 'bg-teal text-charcoal' 
-              : 'bg-slate text-offWhite'
-          }`}
-          onClick={() => setOpenNowFilter(!openNowFilter)}
-        >
-          Open Now
-        </button>
-        
-        {/* Reset filters */}
-        {(priceFilter > 0 || ratingFilter > 0 || openNowFilter) && (
-          <button
-            className="px-4 py-1 text-sm bg-magenta text-offWhite rounded-md"
-            onClick={resetFilters}
-          >
-            Reset Filters
-          </button>
-        )}
       </div>
-      
+
       {error && (
-        <div className="bg-magenta bg-opacity-20 border border-magenta text-offWhite p-3 rounded-lg mb-4">
+        <div className="bg-magenta bg-opacity-20 border border-magenta text-offWhite p-4 rounded-lg mb-6">
           {error}
         </div>
       )}
-      
+
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber"></div>
         </div>
+      ) : filteredBars.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredBars.map(bar => (
+            <BarCard 
+              key={bar.id} 
+              bar={bar} 
+              image={getBarImage(bar)}
+              showDistance={Boolean(userLocation && bar.distance)} 
+            />
+          ))}
+        </div>
       ) : (
-        <>
-          {/* Show results count */}
-          <p className="text-offWhite mb-4">
-            {filteredBars.length === searchResults.length 
-              ? `Showing all ${searchResults.length} bars` 
-              : `Showing ${filteredBars.length} of ${searchResults.length} bars`}
-          </p>
-          
-          {/* Results grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredBars && filteredBars.length > 0 ? (
-              filteredBars.map(bar => (
-                <BarCard key={bar.id} bar={bar} showDistance={true} />
-              ))
-            ) : (
-              <div className="col-span-full py-8 text-center text-offWhite">
-                No bars match your search criteria
-              </div>
-            )}
-          </div>
-        </>
+        <div className="text-center py-12 text-offWhite">
+          {bars.length > 0 
+            ? "No bars match your current filters." 
+            : location 
+              ? "No bars found. Try a different search." 
+              : "Please allow location access to find bars."}
+        </div>
       )}
     </div>
   );

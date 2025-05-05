@@ -6,12 +6,15 @@ Organized by function: Authentication, User Management, Bar Data, and Favorites.
 #------------------------------------------------------
 # Imports
 import logging
+from datetime import datetime, timedelta
+from math import sin, cos, sqrt, atan2, radians
 
 # Django imports
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django.db.models import F, ExpressionWrapper, FloatField
 from django.db.models.functions import Sin, Cos, ACos, Radians
+from django.db.models import Q
 
 # REST Framework imports
 from django.conf import settings
@@ -120,210 +123,314 @@ class BarViewSet(viewsets.ModelViewSet):
     authentication_classes = (TokenAuthentication,)
     
     def list(self, request):
-        """Get bars with location-based filtering and enhanced details"""
+        """Get bars with properly calculated distances"""
         try:
-            # Get location parameters
-            lat = request.query_params.get('lat')
-            lng = request.query_params.get('lng')
-            radius = int(request.query_params.get('radius', 10)) * 1609  # Convert miles to meters
-            limit = int(request.query_params.get('limit', 12))
+            # Check for global search mode
+            query = request.query_params.get('query')
+            is_global = request.query_params.get('global', 'false').lower() == 'true'
             
-            if lat and lng:
-                # Get bars from local database first
-                local_bars = self.get_bars_from_database(float(lat), float(lng), radius, limit)
-                
-                # Initialize Google Maps client
-                gmaps = googlemaps.Client(key=settings.GOOGLE_MAPS_API_KEY)
-                
-                # Update existing bars with missing details
-                self.update_bar_details(local_bars, gmaps)
-                
-                # If not enough results, fetch new bars from Google Places API
-                if len(local_bars) < limit:
-                    new_bars = self.fetch_new_bars_from_places(float(lat), float(lng), radius, limit - len(local_bars), gmaps)
-                    # logger.debug(f"Fetched {len(new_bars)} new bars from Google Places API")
-                    local_bars.extend(new_bars)
-                    
-                    # Sort all bars by distance
-                    local_bars.sort(key=lambda x: getattr(x, 'distance', float('inf')))
-                
-                # Serialize and return results (limit to requested number)
-                serializer = self.get_serializer(local_bars[:limit], many=True)
+            # Process global search
+            if is_global and query:
+                bars = Bar.objects.search_by_query(query)
+                serializer = self.get_serializer(bars, many=True)
                 return Response(serializer.data)
+            
+            # Get location parameters
+            try:
+                lat = float(request.query_params.get('lat', 0))
+                lng = float(request.query_params.get('lng', 0))
+                radius = int(request.query_params.get('radius', 5000))
+                limit = int(request.query_params.get('limit', 12))
+            except (ValueError, TypeError):
+                return Response({"error": "Invalid location parameters"}, status=400)
                 
-            # If no location provided, return standard queryset
-            queryset = self.get_queryset()
-            serializer = self.get_serializer(queryset, many=True)
-            return Response(serializer.data)
+            # Return error if no location provided
+            if lat == 0 and lng == 0:
+                return Response({"error": "Location parameters required"}, status=400)
+            
+            # Get nearby bars using the manager method
+            bars = Bar.objects.nearby(lat, lng, radius)
+            
+            # Apply price and rating filters if needed
+            if request.query_params.get('price_level'):
+                bars = [b for b in bars if b.price_level == int(request.query_params.get('price_level'))]
+                
+            if request.query_params.get('rating'):
+                bars = [b for b in bars if b.rating and b.rating >= float(request.query_params.get('rating'))]
+            
+            # Apply limit
+            bars = bars[:limit]
+            
+            # Serialize results - need to manually include distance
+            serializer = self.get_serializer(bars, many=True)
+            data = serializer.data
+            
+            # Add the distance to each bar's data
+            for i, bar in enumerate(bars):
+                data[i]['distance'] = round(bar.distance, 1)  # Round to 1 decimal place
+            
+            return Response(data)
                 
         except Exception as e:
-            print(f"Error in BarViewSet.list: {str(e)}")
-            traceback.print_exc()
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-    def get_bars_from_database(self, lat, lng, radius_meters, limit):
-        """Get bars from local database within radius"""
-        # Convert meters to degrees (approximate)
-        radius_degrees = radius_meters / 111000  # ~111km per degree
+            logger.error(f"Error in bar list: {str(e)}")
+            return Response({"error": str(e)}, status=500)
         
-        # Simple bounding box query for performance
-        bars = Bar.objects.filter(
-            type='bar',
-            latitude__gte=lat - radius_degrees,
-            latitude__lte=lat + radius_degrees,
-            longitude__gte=lng - radius_degrees,
-            longitude__lte=lng + radius_degrees
+    def handle_global_search(self, request, query):
+        """Handle global search using the centralized bar manager"""
+        try:
+            logger.info(f"Global search request received - Query: '{query}'")
+            
+            try:
+                limit = int(request.query_params.get('limit', 12))
+            except (ValueError, TypeError):
+                limit = 12
+            
+            # Use the custom manager method - all filtering is handled there
+            bars = Bar.objects.search_by_query(query)
+            
+            # Apply additional filters if specified
+            if request.query_params.get('price_level'):
+                bars = bars.filter(price_level=int(request.query_params.get('price_level')))
+                
+            if request.query_params.get('rating'):
+                bars = bars.filter(rating__gte=float(request.query_params.get('rating')))
+            
+            # Limit results
+            bars = bars[:limit]
+            
+            # Return results
+            serializer = self.get_serializer(bars, many=True)
+            return Response(serializer.data)
+            
+        except Exception as e:
+            logger.error(f"Error in global search: {str(e)}")
+            return Response(
+                {"error": "An error occurred while searching."},
+                status=500
+            )
+    
+    def get_bars_from_database(self, lat, lng, radius, limit):
+        """Get bars from database within given radius"""
+        # Calculate approximate bounding box to improve query performance
+        lat_range = radius / 111000  # 1 degree latitude is approximately 111km
+        lng_range = radius / (111000 * cos(radians(lat)))
+        
+        # Query within bounding box first for performance
+        bars_in_box = Bar.objects.filter(
+            latitude__range=(lat - lat_range, lat + lat_range),
+            longitude__range=(lng - lng_range, lng + lng_range)
         )
         
-        # Filter to exact radius and sort by distance
-        result = []
-        for bar in bars:
-            # Calculate distance using Haversine formula
-            distance = self.haversine_distance(lat, lng, bar.latitude, bar.longitude)
-            if distance <= radius_meters / 1000:  # Convert meters to km
-                bar.distance = distance  # Add distance as attribute (not saved to DB)
-                result.append(bar)
+        # Filter by actual distance
+        result_bars = []
+        for bar in bars_in_box:
+            distance = self.calculate_distance(lat, lng, bar.latitude, bar.longitude)
+            if distance <= radius:
+                bar_data = BarSerializer(bar).data
+                bar_data['distance'] = round(distance / 1609, 1)  # Convert meters to miles and round
+                result_bars.append(bar_data)
         
         # Sort by distance
-        result.sort(key=lambda x: x.distance)
-        return result[:limit]
+        result_bars.sort(key=lambda x: x['distance'])
+        
+        return result_bars[:limit]
     
-    def update_bar_details(self, bars, gmaps_client):
-        """Update bars with missing details from Google Places API"""
-        for bar in bars:
-            # Only update if details are missing
-            if not bar.hours or not bar.photo_reference or not bar.website:
-                try:
-                    # Fetch additional details for this bar
-                    place_details = gmaps_client.place(
-                        place_id=bar.place_id,
-                        fields=['name', 'formatted_phone_number', 'website', 
-                               'opening_hours', 'photo', 'price_level', 'rating']
-                    ).get('result', {})
-                    
-                    print(f"Updating details for {bar.name}")
-                    
-                    # Update photo reference
-                    if 'photo' in place_details and place_details['photo']:
-                        bar.photo_reference = place_details['photo'][0].get('photo_reference')
-                        print(f"  Added photo for {bar.name}")
-                    
-                    # Update hours
-                    if 'opening_hours' in place_details:
-                        bar.hours = place_details['opening_hours'].get('weekday_text')
-                        bar.is_open = place_details['opening_hours'].get('open_now')
-                        print(f"  Added hours for {bar.name}: {bar.hours}")
-                    
-                    # Update other fields
-                    if 'formatted_phone_number' in place_details:
-                        bar.phone_number = place_details['formatted_phone_number']
-                    
-                    if 'website' in place_details:
-                        bar.website = place_details['website']
-                    
-                    # Save the updated bar
-                    bar.save()
-                    
-                except Exception as e:
-                    print(f"  Error updating {bar.name}: {e}")
-    
-    def fetch_new_bars_from_places(self, lat, lng, radius_meters, limit, gmaps_client):
+    def fetch_new_bars_from_places(self, lat, lng, radius, limit, gmaps):
         """Fetch new bars from Google Places API"""
-        try:
-            # Query Google Places API
-            places_result = gmaps_client.places_nearby(
-                location=(lat, lng),
-                radius=radius_meters,
-                type='bar'
-            )
-            # Process and save new bars
-            new_bars = []
-            for place in places_result.get('results', [])[:limit*2]:  # Fetch extra to filter
-                try:
-                    # Skip if bar already exists
-                    if Bar.objects.filter(place_id=place['place_id']).exists():
-                        continue
-                    
-                    # Fetch additional details
-                    place_details = gmaps_client.place(
-                        place_id=place['place_id'],
-                        fields=['name', 'formatted_phone_number', 'website', 
-                               'opening_hours', 'photo', 'price_level', 'rating', 'type']
-                    ).get('result', {})
-
-                    place_types = place.get('types', [])
-                    is_bar = 'bar' in place_types or 'night_club' in place_types
-                    if not is_bar:
-                        print(f"Skipping {place.get('name')} - not a bar (types: {place_types})")
-                        continue
-                    
-                    # Extract photo reference
-                    photo_reference = None
-                    if 'photo' in place_details and place_details['photo']:
-                        photo_reference = place_details['photo'][0].get('photo_reference')
-                    elif 'photo' in place and place['photo']:
-                        photo_reference = place['photo'][0].get('photo_reference')
-                    
-                    # Extract opening hours data
-                    hours_data = None
-                    is_open = None
-                    if 'opening_hours' in place_details:
-                        hours_data = place_details['opening_hours'].get('weekday_text')
-                        is_open = place_details['opening_hours'].get('open_now')
-                    
-                    # Create new bar
-                    bar = Bar(
-                        place_id=place['place_id'],
-                        name=place['name'],
-                        address=place.get('vicinity', ''),
-                        latitude=place['geometry']['location']['lat'],
-                        longitude=place['geometry']['location']['lng'],
-                        rating=place_details.get('rating', place.get('rating')),
-                        price_level=place_details.get('price_level', place.get('price_level')),
-                        phone_number=place_details.get('formatted_phone_number', ''),
-                        website=place_details.get('website', ''),
-                        hours=hours_data,
-                        # is_open=is_open, Fix Bar model to handle this
-                        photo_reference=photo_reference or '',
-                        type='bar'
-                    )
-                    
-                    # Save the new bar
-                    bar.save()
-                    # logger.debug(f"Added new bar: {bar.name}")
-                    
-                    # Calculate and store distance
-                    distance = self.haversine_distance(lat, lng, bar.latitude, bar.longitude)
-                    bar.distance = distance
-                    
-                    # Add to result list
-                    new_bars.append(bar)
-                    
-                    # Break if we have enough new bars
-                    if len(new_bars) >= limit:
-                        break
-                        
-                except Exception as e:
-                    logger.debug(f"Error processing place {place.get('name', 'unknown')}: {e}")
+        # Places API search
+        places_result = gmaps.places_nearby(
+            location=(lat, lng),
+            radius=radius,
+            type='bar',
+            rank_by='distance'
+        )
+        
+        results = places_result.get('results', [])
+    
+        # Also search for nightclubs and combine results
+        nightclub_results = gmaps.places_nearby(
+            location=(lat, lng),
+            radius=radius,
+            type='night_club',
+            rank_by='distance'
+        ).get('results', [])
+    
+        # Combine and deduplicate results
+        place_ids = set()
+        combined_results = []
+    
+        for place in results + nightclub_results:
+            if place['place_id'] not in place_ids:
+                place_ids.add(place['place_id'])
+                combined_results.append(place)
+        
+        new_bars = []
+        existing_bar_ids = set(Bar.objects.values_list('place_id', flat=True))
             
-            return new_bars
+        for place in combined_results:
+            if len(new_bars) >= limit:
+                break
+                
+            place_id = place.get('place_id')
+            
+            # Skip if we already have this bar in our database
+            if place_id in existing_bar_ids:
+                continue
+            
+            # Verify this is actually a bar or nightclub
+            types = place.get('types', [])
+            if 'bar' not in types and 'night_club' not in types:
+                continue
+            
+            # Get more details about the place
+            place_details = gmaps.place(place_id=place_id).get('result', {})
+            
+            # Create a new bar object
+            new_bar = self.create_bar_from_place_details(place_details, lat, lng)
+            
+            if new_bar:
+                new_bars.append(new_bar)
+        
+        return new_bars
+    
+    def create_bar_from_place_details(self, place_details, origin_lat, origin_lng):
+        """Create a new bar from Google Places API details using only existing fields"""
+        try:
+            # Extract essential information
+            place_id = place_details.get('place_id')
+            name = place_details.get('name', 'Unknown Bar')
+
+            types = place_details.get('types', [])
+            if 'bar' not in types and 'night_club' not in types:
+                return None
+            
+            location = place_details.get('geometry', {}).get('location', {})
+            latitude = location.get('lat')
+            longitude = location.get('lng')
+            
+            if not (place_id and latitude and longitude):
+                return None
+            
+            # Extract address (without breaking it down to city/state/postal_code)
+            address = place_details.get('formatted_address', '')
+            phone = place_details.get('formatted_phone_number', '')
+            website = place_details.get('website', '')
+            
+            # Get operating hours
+            hours_data = place_details.get('opening_hours', {}).get('periods', [])
+            if hours_data:
+                cleaned_hours = []
+                for period in hours_data:
+                    if isinstance(period, dict):
+                        cleaned_period = {}
+                        if 'open' in period and isinstance(period['open'], dict):
+                            cleaned_period['open'] = {
+                                'day': period['open'].get('day'),
+                                'time': period['open'].get('time')
+                            }
+                        if 'close' in period and isinstance(period['close'], dict):
+                            cleaned_period['close'] = {
+                                'day': period['close'].get('day'),
+                                'time': period['close'].get('time')
+                            }
+                        if 'open' in cleaned_period:
+                            cleaned_hours.append(cleaned_period)
+                
+                hours = json.dumps(cleaned_hours) 
+            else:
+                hours = None
+            
+            # Get price level and rating if available
+            price_level = place_details.get('price_level')
+            rating = place_details.get('rating')
+            
+            # Calculate distance
+            distance = self.calculate_distance(origin_lat, origin_lng, latitude, longitude)
+            
+            # Create and save the new bar - use only fields that exist in your model
+            new_bar = Bar(
+                place_id=place_id,      # Use this as your primary identifier
+                name=name,
+                address=address,
+                latitude=latitude,
+                longitude=longitude,
+                phone_number=phone,
+                website=website,
+                hours=hours,
+                price_level=price_level,
+                rating=rating,
+                type=types
+            )
+            new_bar.save()
+            
+            # Return serialized data
+            bar_data = BarSerializer(new_bar).data
+            bar_data['distance'] = round(distance / 1609, 1)  # Convert meters to miles and round
+            return bar_data
             
         except Exception as e:
-            logger.debug(f"Error fetching places: {e}")
-            return []
-    
-    def haversine_distance(self, lat1, lon1, lat2, lon2):
-        """Calculate the great circle distance between two points in kilometers"""
-        # Convert decimal degrees to radians
-        lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+            logger.error(f"Error creating bar from place details: {str(e)}")
+            return None
+        
+    def update_bar_details(self, bars_list, gmaps):
+        """Update bar details from Google Places API where needed"""
+        for bar_data in bars_list:
+            if 'google_place_id' not in bar_data or not bar_data['google_place_id']:
+                continue
+                
+            # Check if we need to update details (no hours, no website, etc.)
+            needs_update = (not bar_data.get('hours') or 
+                           not bar_data.get('website') or 
+                           not bar_data.get('phone'))
+            
+            if needs_update:
+                try:
+                    place_details = gmaps.place(place_id=bar_data['google_place_id']).get('result', {})
+                    
+                    # Update bar object
+                    bar = Bar.objects.get(id=bar_data['id'])
+                    
+                    if not bar.hours and 'opening_hours' in place_details:
+                        hours_data = place_details['opening_hours'].get('periods', [])
+                        bar.hours = json.dumps(hours_data)
+                        
+                    if not bar.website and 'website' in place_details:
+                        bar.website = place_details['website']
+                        
+                    if not bar.phone and 'formatted_phone_number' in place_details:
+                        bar.phone = place_details['formatted_phone_number']
+                    
+                    bar.save()
+                    
+                    # Update the data in our results list
+                    bar_data['hours'] = bar.hours
+                    bar_data['website'] = bar.website
+                    bar_data['phone'] = bar.phone
+                    
+                except Exception as e:
+                    logger.error(f"Error updating bar details: {str(e)}")
+        
+    def calculate_distance(self, lat1, lon1, lat2, lon2):
+        """Calculate distance between two points using Haversine formula"""
+        # Radius of the Earth in meters
+        R = 6371000
+        
+        # Convert coordinates to radians
+        lat1_rad = radians(lat1)
+        lon1_rad = radians(lon1)
+        lat2_rad = radians(lat2)
+        lon2_rad = radians(lon2)
+        
+        # Differences
+        dlon = lon2_rad - lon1_rad
+        dlat = lat2_rad - lat1_rad
         
         # Haversine formula
-        dlon = lon2 - lon1
-        dlat = lat2 - lat1
-        a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-        c = 2 * asin(sqrt(a))
-        r = 6371  # Radius of earth in kilometers
-        return c * r
+        a = sin(dlat/2)**2 + cos(lat1_rad) * cos(lat2_rad) * sin(dlon/2)**2
+        c = 2 * atan2(sqrt(a), sqrt(1-a))
+        distance = R * c
+        
+        return distance
 
 class WaitTimeViewSet(viewsets.ModelViewSet):
     """ViewSet for reporting and retrieving bar wait times"""
