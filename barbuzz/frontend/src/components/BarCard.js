@@ -4,22 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
 import { isCurrentlyOpen, formatHoursDisplay } from '../utils/barUtils';
 import { useEffect } from 'react';
-
-// Helper function for bar images
-const getBarImage = (bar) => {
-  if (bar.image) return bar.image;
-  
-  const barImages = [
-    'https://images.unsplash.com/photo-1514933651103-005eec06c04b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1543007630-9710e4a00a20?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1470337458703-46ad1756a187?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1510626176961-4b57d4fbad03?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1575444758702-4a6b9222336e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-  ];
-  
-  const index = bar.id ? bar.id % barImages.length : 0;
-  return barImages[index];
-};
+import axios from 'axios';
 
 const BarCard = ({ bar, showDistance = true }) => {
   const { isAuthenticated } = useAuth();
@@ -27,6 +12,9 @@ const BarCard = ({ bar, showDistance = true }) => {
   const [isToggling, setIsToggling] = useState(false);
   const [isOpen, setOpen] = useState(null);
   const [formattedHours, setFormattedHours] = useState([]);
+  const [imageUrl, setImageUrl] = useState(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
   
   // Determine if bar is open using the shared utility
   useEffect(() => {
@@ -41,6 +29,35 @@ const BarCard = ({ bar, showDistance = true }) => {
       } catch (error) {
         console.error(`Error processing hours for ${bar.name}:`, error);
       }
+    }
+  }, [bar]);
+
+  useEffect(() => {
+    const loadBarPhoto = async () => {
+      try {
+        // Reset states
+        setImageLoaded(false);
+        setImageError(false);
+        
+        console.log(`Loading image for ${bar.name}:`, {
+          hasImage: Boolean(bar.image),
+          imageUrl: bar.image?.substring(0, 30) + '...'
+        });
+        
+        if (bar.image) {
+          setImageUrl(bar.image);
+        } else {
+          // No image available
+          setImageUrl(null);
+        }
+      } catch (error) {
+        console.error(`Error setting up image for ${bar.name}:`, error);
+        setImageError(true);
+      }
+    };
+    
+    if (bar && bar.id) {
+      loadBarPhoto();
     }
   }, [bar]);
 
@@ -94,15 +111,19 @@ const BarCard = ({ bar, showDistance = true }) => {
       <Link to={`/bars/${bar.id}`} className="block">
         <div className="bg-slate bg-opacity-50 backdrop-blur-sm border border-white border-opacity-10 rounded-xl overflow-hidden hover:translate-y-[-4px] transition duration-300">
           <div className="h-48 bg-gray-800 relative overflow-hidden">
-            <img 
-              src={getBarImage(bar)} 
-              alt={bar.name} 
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                e.target.onerror = null; 
-                e.target.src = 'https://placehold.co/400x300/1e293b/f59e0b?text=Bar';
-              }}
+            {imageUrl && !imageError ? (
+            <img
+              src={imageUrl}
+              alt={bar.name}
+              className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageError(true)}
             />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-slate-500">
+              {bar.name.substring(0, 1)}
+            </div>
+          )}
             
             {/* Price level badge */}
             {bar.price_level > 0 && (
