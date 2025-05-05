@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
+import { isCurrentlyOpen, formatHoursDisplay } from '../utils/barUtils';
+import { useEffect } from 'react';
 
 // Helper function for bar images
 const getBarImage = (bar) => {
@@ -19,40 +21,31 @@ const getBarImage = (bar) => {
   return barImages[index];
 };
 
-// Helper function for open status
-const isCurrentlyOpen = (hoursArray) => {
-  if (!hoursArray || !Array.isArray(hoursArray) || hoursArray.length < 7) {
-    return undefined;
-  }
-  
-  const now = new Date();
-  const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const currentDay = daysOfWeek[now.getDay()];
-  
-  const todayHours = hoursArray.find(hourString => 
-    hourString.startsWith(currentDay)
-  );
-  
-  if (!todayHours || todayHours.includes('Closed')) {
-    return false;
-  }
-  
-  return true;
-};
-
 const BarCard = ({ bar, showDistance = true }) => {
   const { isAuthenticated } = useAuth();
   const { isFavorite, toggleBarFavorite } = useFavorites();
   const [isToggling, setIsToggling] = useState(false);
+  const [isOpen, setOpen] = useState(null);
+  const [formattedHours, setFormattedHours] = useState([]);
   
+  // Determine if bar is open using the shared utility
+  useEffect(() => {
+    if (bar.hours) {
+      try {
+        const isOpen = isCurrentlyOpen(bar.hours);
+        setOpen(isOpen);
+        
+        // Format hours for display
+        const formatted = formatHoursDisplay(bar.hours);
+        setFormattedHours(formatted);
+      } catch (error) {
+        console.error(`Error processing hours for ${bar.name}:`, error);
+      }
+    }
+  }, [bar]);
+
   // Check if bar is in favorites
   const favorited = isAuthenticated && isFavorite(bar.id);
-  
-  // Determine if bar is open
-  const isOpen = bar.is_open !== undefined 
-    ? bar.is_open 
-    : isCurrentlyOpen(bar.hours);
-
   // Handle favorite toggle
   const handleFavoriteClick = async (e) => {
     // Prevent navigation to bar detail page
