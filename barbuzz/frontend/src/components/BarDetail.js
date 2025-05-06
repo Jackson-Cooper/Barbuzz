@@ -39,9 +39,7 @@ const BarDetail = () => {
   if (!bar) return <div className="text-center text-gray-300 py-10">Bar not found</div>;
 
   const formattedHours = groupHours(bar.hours);
-  const imageUrl = bar.photo_reference
-    ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${bar.photo_reference}&key=${process.env.GOOGLE_MAPS_API_KEY}`
-    : null;
+  const imageUrl = bar.image;
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-charcoal rounded shadow-md text-center">
@@ -85,10 +83,10 @@ const BarDetail = () => {
         <div className="text-center">
           <h2 className="text-2xl font-semibold mb-2 text-white">Current Wait Time</h2>
           <div className="text-xl font-medium text-green-400">
-            {waitTimes.length > 0 ? (
+            {waitTimes[0] > 0 ? (
               <span>{waitTimes[0]} minutes</span>
             ) : (
-              <span>No wait times available</span>
+              <span>Bar is Currently Closed</span>
             )}
           </div>
         </div>

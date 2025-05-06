@@ -373,7 +373,7 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
         try:
             bar = Bar.objects.get(pk=bar_id)
         except Bar.DoesNotExist:
-            return Response({"error": "Bar not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({[0]}, status=status.HTTP_404_NOT_FOUND)
 
         try:
             if not bar.is_open_now():
