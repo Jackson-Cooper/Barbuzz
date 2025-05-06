@@ -33,6 +33,11 @@ services:
       - db
     # Allows to bypass automatic migrations
     #command: bash -c "sleep infinity"
+
+    # Environment variables
+    # to be used in the backend
+    env_file:
+      - ../.env
     
   db:
 

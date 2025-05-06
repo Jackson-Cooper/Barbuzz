@@ -113,6 +113,19 @@ class Bar(models.Model):
         """
         latest_wait = self.wait_times.order_by('-timestamp').first()
         return latest_wait.estimated_wait if latest_wait else None
+    
+    def is_open_now(self):
+        """
+        Check if the bar is currently open based on its hours.
+        """
+        from datetime import datetime
+        now = datetime.now().time()
+        current_day = datetime.now().strftime('%A').lower()
+        
+        if self.hours and current_day in self.hours:
+            open_time, close_time = self.hours[current_day]
+            return open_time <= now <= close_time
+        return False
 
 class WaitTime(models.Model):
     bar = models.ForeignKey(Bar, on_delete=models.CASCADE, related_name='wait_times')
