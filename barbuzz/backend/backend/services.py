@@ -53,22 +53,14 @@ class WaitTimeService:
             str: Venue ID from Best Time API or None if not found
         """
         url = "https://besttime.app/api/v1/forecasts"
-        try:
-            resp = requests.post(url, params={
-                'api_key_private': settings.BEST_TIME_API_KEY_PRIVATE,
-                'venue_name': bar.name,
-                'venue_address': bar.address,
-            })
-            resp.raise_for_status()
-            data = resp.json()
-            return data['venue_info']['venue_id']
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 404:
-                # Venue not found in Best Time API
-                logger.warning(f"Venue not found in Best Time API: {bar.name} at {bar.address}")
-                return None
-            else:
-                raise
+        resp = requests.post(url, params={
+            'api_key_private': settings.BEST_TIME_API_KEY_PRIVATE,
+            'venue_name': bar.name,
+            'venue_address': bar.address,
+        })
+        resp.raise_for_status()
+        data = resp.json()
+        return data['venue_info']['venue_id']
     
     @staticmethod
     def get_current_busyness(venue_id):

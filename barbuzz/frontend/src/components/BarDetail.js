@@ -19,8 +19,14 @@ const BarDetail = () => {
         const barResponse = await fetchBar(barId);
         setBar(barResponse.data);
         
-        const waitTimesResponse = await fetchWaitTimes(barId);
-        setWaitTimes(waitTimesResponse.data);
+        try {
+          const waitTimesResponse = await fetchWaitTimes(barId);
+          setWaitTimes(waitTimesResponse.data);
+        } catch (err) {
+          // console.error('Error loading wait times:', err);
+          // setting a default value if wait times are not available
+          setWaitTimes([]);
+        }
         
         setError(null);
       } catch (err) {
