@@ -17,6 +17,7 @@ class PlacesService:
     
     def __init__(self):
         """Initialize the service with Google Maps API client."""
+        logger.debug("Initializing PlacesService with Google Maps API key: {settings.GOOGLE_MAPS_API_KEY}")
         self.client = googlemaps.Client(key=settings.GOOGLE_MAPS_API_KEY)
     
     def get_place_details(self, place_id):
@@ -49,17 +50,25 @@ class WaitTimeService:
             bar (Bar): Bar instance
             
         Returns:
-            str: Venue ID from Best Time API
+            str: Venue ID from Best Time API or None if not found
         """
         url = "https://besttime.app/api/v1/forecasts"
-        resp = requests.post(url, params={
-            'api_key_private': settings.BEST_TIME_API_KEY_PRIVATE,
-            'venue_name': bar.name,
-            'venue_address': bar.address,
-        })
-        resp.raise_for_status()
-        data = resp.json()
-        return data['venue_info']['venue_id']
+        try:
+            resp = requests.post(url, params={
+                'api_key_private': settings.BEST_TIME_API_KEY_PRIVATE,
+                'venue_name': bar.name,
+                'venue_address': bar.address,
+            })
+            resp.raise_for_status()
+            data = resp.json()
+            return data['venue_info']['venue_id']
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                # Venue not found in Best Time API
+                logger.warning(f"Venue not found in Best Time API: {bar.name} at {bar.address}")
+                return None
+            else:
+                raise
     
     @staticmethod
     def get_current_busyness(venue_id):

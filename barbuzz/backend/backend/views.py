@@ -290,6 +290,8 @@ class BarViewSet(viewsets.ModelViewSet):
             address = place_details.get('formatted_address', '')
             phone = place_details.get('formatted_phone_number', '')
             website = place_details.get('website', '')
+            is_open = place_details.get('opening_hours', {}).get('open_now', False)
+            # logger.debug(f"Place is open: {is_open}")
             
             hours_data = place_details.get('opening_hours', {}).get('periods', [])
             if hours_data:
@@ -310,9 +312,7 @@ class BarViewSet(viewsets.ModelViewSet):
                         if 'open' in cleaned_period:
                             cleaned_hours.append(cleaned_period)
                 
-                hours = json.dumps(cleaned_hours) 
-            else:
-                hours = None
+                hours = json.dumps(cleaned_hours)
             
             price_level = place_details.get('price_level')
             rating = place_details.get('rating')
@@ -327,10 +327,12 @@ class BarViewSet(viewsets.ModelViewSet):
                 longitude=longitude,
                 phone_number=phone,
                 website=website,
+                # photo_reference=photo_reference,
                 hours=hours,
                 price_level=price_level,
                 rating=rating,
-                type=types
+                type=types,
+                is_open=is_open
             )
             new_bar.save()
             
@@ -375,6 +377,10 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
             return Response({"error": "Bar not found"}, status=status.HTTP_404_NOT_FOUND)
 
         try:
+            # logger.debug(f"Bar is open? {bar.is_open}")
+            # if not bar.is_open:
+            #     return Response({0}, status=status.HTTP_200_OK)
+            # else:
             service = WaitTimeService()
             venue_id = service.create_forecast(bar)
             busyness_pct = service.get_current_busyness(venue_id)
@@ -391,7 +397,7 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
 
             logger.debug(f"Wait time data: {wait_time_data}")
             return Response([wait_time], status=status.HTTP_200_OK)
-            
+                
         except Exception as e:
             logger.error(f"Error fetching wait time: {str(e)}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
