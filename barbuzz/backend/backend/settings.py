@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -214,10 +215,12 @@ SPECTACULAR_SETTINGS = {
     "EXTERNAL_DOCS": {"description": "allauth", "url": "/_allauth/openapi.html"},
 }
 
-# GOOGLE_MAPS_API_KEY = "AIzaSyDQsT_Mtp7MKyNpdOZyqecAJ6yex-8x35g"
-GOOGLE_MAPS_API_KEY = "AIzaSyB_SDS1k2fox9lQ-7Yz2chEoKZ8tYMidcU"
-BEST_TIME_API_KEY_PRIVATE = "pri_1bbf0fff2e8441eca4eb5a9b8318fbcc"
-BEST_TIME_API_KEY_PUBLIC = "pub_fac664a52ae3407993aec429457dc4f8"
+load_dotenv()
+
+# Use environment variables for sensitive data
+GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY")
+BEST_TIME_API_KEY_PRIVATE = os.environ.get("BEST_TIME_API_KEY_PRIVATE")
+BEST_TIME_API_KEY_PUBLIC = os.environ.get("BEST_TIME_API_KEY_PUBLIC")
 
 LOGGING = {
     'version': 1,

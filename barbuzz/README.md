@@ -1,7 +1,9 @@
-# Barbuzz - Bar Search and Wait Time App
+# Barbuzz
 
-* Project Structure
-```
+Barbuzz is an application for discovering local bars, checking wait times, and finding information about venues near you.
+
+# Structure
+
 barbuzz/
 ├── backend/               # Django project
 │   ├── backend/           # Main app
@@ -30,42 +32,41 @@ barbuzz/
 │   ├── package-lock.json
 │   └── Dockerfile
 ├── docker-compose.yml     # Docker configuration
-└── README.org             # This file
-```
+└── README.md              
 
-* Setup Instructions
+## Installation
 
-** Backend Setup
-# bash
+Backend Setup:
 cd backend
 pip install -r requirements.txt
 docker-compose up -d
 docker-compose exec backend python manage.py migrate
-docker-compose exec backend python manage.py runserver 0.0.0.0:8001
-#
+docker-compose exec backend python manage.py runserver
 
-** Frontend Setup
-# bash
+Frontend Setup:
 cd frontend
 npm install
-- `npm start` - Runs the app in development mode
-- `npm test` - Launches the test runner
-- `npm run build` - Builds the app for production
-#
 
-** Docker Setup
-# bash
+Docker Setup:
 docker-compose build
 docker-compose up
-#
 
-* API Endpoints
-- Bars: =/api/bars/=
-- Wait Times: =/api/wait-times/=
-- User Profiles: =/api/user-profiles/=
-- Authentication: =/auth/=
+API Endpoints:
+Bars: /api/bars/
+Wait Times: /api/wait-times/
+User Profiles: /api/user-profiles/
+Authentication: /auth/
 
-* Development Notes
-- Backend runs on port 8000
-- Frontend runs on port 3000
-- Debug mode is enabled by default
+## Features
+
+Bar Search: Find bars near your location with advanced filtering options
+Real-time Wait Times: See how busy a bar is before you go
+Favorites: Save your favorite bars for quick access
+Bar Details: View hours, ratings, prices, and other information
+
+Tech Stack:
+Frontend: React, TailwindCSS
+Backend: Django, Django REST Framework
+Database: PostgreSQL
+API Integration: Google Places API, Best Time API
+Authentication: Token-based authentication

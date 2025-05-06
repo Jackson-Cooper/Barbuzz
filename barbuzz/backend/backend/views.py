@@ -1,33 +1,24 @@
 """
 API views for the BarBuzz application.
-Organized by function: Authentication, User Management, Bar Data, and Favorites.
+
+This module contains all the API endpoints for the BarBuzz application,
+organized by functionality: Authentication, User Management, Bar Data, and Favorites.
 """
 
-#------------------------------------------------------
-# Imports
 import logging
-from datetime import datetime, timedelta
-from math import sin, cos, sqrt, atan2, radians
-
-# Django imports
 from django.contrib.auth.models import User
-from django.contrib.auth import authenticate
-from django.db.models import F, ExpressionWrapper, FloatField
-from django.db.models.functions import Sin, Cos, ACos, Radians
-from django.db.models import Q
-
-# REST Framework imports
+from django.shortcuts import get_object_or_404
 from django.conf import settings
+
 from rest_framework import viewsets, permissions, status, serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.decorators import api_view, permission_classes, action
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 
-# Local imports
 from .models import Bar, Favorite, WaitTime, UserProfile
 from .serializers import (
     BarSerializer, 
@@ -35,33 +26,39 @@ from .serializers import (
     UserProfileSerializer, 
     UserRegistrationSerializer
 )
+from .utils import haversine_distance
+from .services import PlacesService, WaitTimeService
 
-# API imports
 import json
-import googlemaps
-import requests
-import traceback
-from math import radians, sin, cos, sqrt, asin
 
-#------------------------------------------------------
-# Logging setup
 logger = logging.getLogger(__name__)
-#------------------------------------------------------
-# Authentication Views
-#------------------------------------------------------
+
+# Authentication and User Views
 
 class UserSerializer(serializers.ModelSerializer):
-    """Serializer for the Django User model - used for authentication responses"""
+    """
+    Serializer for the Django User model - used for authentication responses.
+    """
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name']
 
 class UserRegistrationAPIView(APIView):
-    """API endpoint for user registration"""
+    """
+    API endpoint for user registration.
+    """
     permission_classes = [AllowAny]
     
     def post(self, request):
-        """Register a new user"""
+        """
+        Register a new user.
+        
+        Args:
+            request: HTTP request containing user data
+            
+        Returns:
+            Response: Success message or validation errors
+        """
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
@@ -71,12 +68,33 @@ class UserRegistrationAPIView(APIView):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_current_user(request):
-    """Get information about the currently authenticated user"""
+    """
+    Get information about the currently authenticated user.
+    
+    Args:
+        request: HTTP request with authentication
+        
+    Returns:
+        Response: Serialized user data
+    """
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
 
 class CustomAuthToken(ObtainAuthToken):
+    """
+    Custom token authentication endpoint with enhanced responses.
+    """
+    
     def post(self, request, *args, **kwargs):
+        """
+        Authenticate user and provide an access token.
+        
+        Args:
+            request: HTTP request containing credentials
+            
+        Returns:
+            Response: Authentication token or error message
+        """
         serializer = self.serializer_class(data=request.data, context={'request': request})
         if not serializer.is_valid():
             return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
@@ -86,56 +104,90 @@ class CustomAuthToken(ObtainAuthToken):
         return Response({'token': token.key})
 
 class LogoutAPIView(APIView):
-    """API endpoint for user logout"""
+    """
+    API endpoint for user logout.
+    """
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
-        """Delete the user's authentication token to log them out"""
+        """
+        Delete the user's authentication token to log them out.
+        
+        Args:
+            request: HTTP request with authentication
+            
+        Returns:
+            Response: Success message
+        """
         Token.objects.filter(user=request.user).delete()
         return Response({"message": "Successfully logged out"})
 
-#------------------------------------------------------
 # User Profile Views
-#------------------------------------------------------
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_user_profile(request):
-    """Get the profile of the current authenticated user"""
+    """
+    Get the profile of the current authenticated user.
+    
+    Args:
+        request: HTTP request with authentication
+        
+    Returns:
+        Response: Serialized user profile data
+    """
     profile = UserProfile.objects.get(user=request.user)
     serializer = UserProfileSerializer(profile)
     return Response(serializer.data)
 
 class UserProfileViewSet(viewsets.ReadOnlyModelViewSet):
-    """ViewSet for viewing user profiles (admin access to all profiles)"""
+    """
+    ViewSet for viewing user profiles (admin access to all profiles).
+    """
     queryset = UserProfile.objects.all()
     serializer_class = UserProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-#------------------------------------------------------
-# Bar and Wait Time Views
-#------------------------------------------------------
+# Bar Views
 
 class BarViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing bars and related data.
+    
+    Provides endpoints for creating, retrieving, updating, and deleting bars,
+    as well as searching for nearby bars.
+    """
     queryset = Bar.objects.all()
     serializer_class = BarSerializer
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = (TokenAuthentication,)
     
     def list(self, request):
-        """Get bars with properly calculated distances"""
+        """
+        Get bars with properly calculated distances based on query parameters.
+        
+        Supports filtering by:
+        - lat, lng: User location coordinates
+        - radius: Search radius in meters
+        - limit: Maximum number of results
+        - price_level: Filter by price level
+        - rating: Minimum rating threshold
+        - query: Search text (when global=true)
+        - global: Whether to perform a global search
+        
+        Args:
+            request: HTTP request with query parameters
+            
+        Returns:
+            Response: Serialized bar data with distances
+        """
         try:
-            # Check for global search mode
             query = request.query_params.get('query')
             is_global = request.query_params.get('global', 'false').lower() == 'true'
             
-            # Process global search
             if is_global and query:
-                bars = Bar.objects.search_by_query(query)
-                serializer = self.get_serializer(bars, many=True)
-                return Response(serializer.data)
+                return self._handle_global_search(request, query)
             
-            # Get location parameters
             try:
                 lat = float(request.query_params.get('lat', 0))
                 lng = float(request.query_params.get('lng', 0))
@@ -144,39 +196,42 @@ class BarViewSet(viewsets.ModelViewSet):
             except (ValueError, TypeError):
                 return Response({"error": "Invalid location parameters"}, status=400)
                 
-            # Return error if no location provided
             if lat == 0 and lng == 0:
                 return Response({"error": "Location parameters required"}, status=400)
             
-            # Get nearby bars using the manager method
             bars = Bar.objects.nearby(lat, lng, radius)
             
-            # Apply price and rating filters if needed
             if request.query_params.get('price_level'):
                 bars = [b for b in bars if b.price_level == int(request.query_params.get('price_level'))]
                 
             if request.query_params.get('rating'):
                 bars = [b for b in bars if b.rating and b.rating >= float(request.query_params.get('rating'))]
             
-            # Apply limit
             bars = bars[:limit]
             
-            # Serialize results - need to manually include distance
             serializer = self.get_serializer(bars, many=True)
             data = serializer.data
             
-            # Add the distance to each bar's data
             for i, bar in enumerate(bars):
-                data[i]['distance'] = round(bar.distance, 1)  # Round to 1 decimal place
+                data[i]['distance'] = round(bar.distance, 1)
             
             return Response(data)
                 
         except Exception as e:
             logger.error(f"Error in bar list: {str(e)}")
             return Response({"error": str(e)}, status=500)
+    
+    def _handle_global_search(self, request, query):
+        """
+        Handle global search using the centralized bar manager.
         
-    def handle_global_search(self, request, query):
-        """Handle global search using the centralized bar manager"""
+        Args:
+            request: HTTP request
+            query (str): Search query
+            
+        Returns:
+            Response: Serialized bar data matching the query
+        """
         try:
             logger.info(f"Global search request received - Query: '{query}'")
             
@@ -185,20 +240,16 @@ class BarViewSet(viewsets.ModelViewSet):
             except (ValueError, TypeError):
                 limit = 12
             
-            # Use the custom manager method - all filtering is handled there
             bars = Bar.objects.search_by_query(query)
             
-            # Apply additional filters if specified
             if request.query_params.get('price_level'):
                 bars = bars.filter(price_level=int(request.query_params.get('price_level')))
                 
             if request.query_params.get('rating'):
                 bars = bars.filter(rating__gte=float(request.query_params.get('rating')))
             
-            # Limit results
             bars = bars[:limit]
             
-            # Return results
             serializer = self.get_serializer(bars, many=True)
             return Response(serializer.data)
             
@@ -209,94 +260,19 @@ class BarViewSet(viewsets.ModelViewSet):
                 status=500
             )
     
-    def get_bars_from_database(self, lat, lng, radius, limit):
-        """Get bars from database within given radius"""
-        # Calculate approximate bounding box to improve query performance
-        lat_range = radius / 111000  # 1 degree latitude is approximately 111km
-        lng_range = radius / (111000 * cos(radians(lat)))
-        
-        # Query within bounding box first for performance
-        bars_in_box = Bar.objects.filter(
-            latitude__range=(lat - lat_range, lat + lat_range),
-            longitude__range=(lng - lng_range, lng + lng_range)
-        )
-        
-        # Filter by actual distance
-        result_bars = []
-        for bar in bars_in_box:
-            distance = self.calculate_distance(lat, lng, bar.latitude, bar.longitude)
-            if distance <= radius:
-                bar_data = BarSerializer(bar).data
-                bar_data['distance'] = round(distance / 1609, 1)  # Convert meters to miles and round
-                result_bars.append(bar_data)
-        
-        # Sort by distance
-        result_bars.sort(key=lambda x: x['distance'])
-        
-        return result_bars[:limit]
-    
-    def fetch_new_bars_from_places(self, lat, lng, radius, limit, gmaps):
-        """Fetch new bars from Google Places API"""
-        # Places API search
-        places_result = gmaps.places_nearby(
-            location=(lat, lng),
-            radius=radius,
-            type='bar',
-            rank_by='distance'
-        )
-        
-        results = places_result.get('results', [])
-    
-        # Also search for nightclubs and combine results
-        nightclub_results = gmaps.places_nearby(
-            location=(lat, lng),
-            radius=radius,
-            type='night_club',
-            rank_by='distance'
-        ).get('results', [])
-    
-        # Combine and deduplicate results
-        place_ids = set()
-        combined_results = []
-    
-        for place in results + nightclub_results:
-            if place['place_id'] not in place_ids:
-                place_ids.add(place['place_id'])
-                combined_results.append(place)
-        
-        new_bars = []
-        existing_bar_ids = set(Bar.objects.values_list('place_id', flat=True))
-            
-        for place in combined_results:
-            if len(new_bars) >= limit:
-                break
-                
-            place_id = place.get('place_id')
-            
-            # Skip if we already have this bar in our database
-            if place_id in existing_bar_ids:
-                continue
-            
-            # Verify this is actually a bar or nightclub
-            types = place.get('types', [])
-            if 'bar' not in types and 'night_club' not in types:
-                continue
-            
-            # Get more details about the place
-            place_details = gmaps.place(place_id=place_id).get('result', {})
-            
-            # Create a new bar object
-            new_bar = self.create_bar_from_place_details(place_details, lat, lng)
-            
-            if new_bar:
-                new_bars.append(new_bar)
-        
-        return new_bars
-    
     def create_bar_from_place_details(self, place_details, origin_lat, origin_lng):
-        """Create a new bar from Google Places API details using only existing fields"""
+        """
+        Create a new bar from Google Places API details.
+        
+        Args:
+            place_details (dict): Details from Google Places API
+            origin_lat (float): Latitude of reference point for distance calculation
+            origin_lng (float): Longitude of reference point for distance calculation
+            
+        Returns:
+            dict: Serialized bar data with distance or None if creation fails
+        """
         try:
-            # Extract essential information
             place_id = place_details.get('place_id')
             name = place_details.get('name', 'Unknown Bar')
 
@@ -311,18 +287,10 @@ class BarViewSet(viewsets.ModelViewSet):
             if not (place_id and latitude and longitude):
                 return None
             
-            # Extract address (without breaking it down to city/state/postal_code)
             address = place_details.get('formatted_address', '')
             phone = place_details.get('formatted_phone_number', '')
             website = place_details.get('website', '')
             
-            # Get photo reference
-            photo_reference = None
-            photos = place_details.get('photos', [])
-            if photos and isinstance(photos, list):
-                photo_reference = photos[0].get('photo_reference')
-            
-            # Get operating hours
             hours_data = place_details.get('opening_hours', {}).get('periods', [])
             if hours_data:
                 cleaned_hours = []
@@ -345,16 +313,14 @@ class BarViewSet(viewsets.ModelViewSet):
                 hours = json.dumps(cleaned_hours) 
             else:
                 hours = None
-
+            
             price_level = place_details.get('price_level')
             rating = place_details.get('rating')
             
-            # Calculate distance
-            distance = self.calculate_distance(origin_lat, origin_lng, latitude, longitude)
+            distance = haversine_distance(origin_lat, origin_lng, latitude, longitude)
             
-            # Create and save the new bar - use only fields that exist in your model
             new_bar = Bar(
-                place_id=place_id,      # Use this as your primary identifier
+                place_id=place_id,
                 name=name,
                 address=address,
                 latitude=latitude,
@@ -369,77 +335,22 @@ class BarViewSet(viewsets.ModelViewSet):
             )
             new_bar.save()
             
-            # Return serialized data
             bar_data = BarSerializer(new_bar).data
-            bar_data['distance'] = round(distance / 1609, 1)  # Convert meters to miles and round
+            bar_data['distance'] = round(distance / 1609, 1)  
             return bar_data
             
         except Exception as e:
             logger.error(f"Error creating bar from place details: {str(e)}")
             return None
-        
-    def update_bar_details(self, bars_list, gmaps):
-        """Update bar details from Google Places API where needed"""
-        for bar_data in bars_list:
-            if 'google_place_id' not in bar_data or not bar_data['google_place_id']:
-                continue
-                
-            # Check if we need to update details (no hours, no website, etc.)
-            needs_update = (not bar_data.get('hours') or 
-                           not bar_data.get('website') or 
-                           not bar_data.get('phone'))
-            
-            if needs_update:
-                try:
-                    place_details = gmaps.place(place_id=bar_data['google_place_id']).get('result', {})
-                    
-                    # Update bar object
-                    bar = Bar.objects.get(id=bar_data['id'])
-                    
-                    if not bar.hours and 'opening_hours' in place_details:
-                        hours_data = place_details['opening_hours'].get('periods', [])
-                        bar.hours = json.dumps(hours_data)
-                        
-                    if not bar.website and 'website' in place_details:
-                        bar.website = place_details['website']
-                        
-                    if not bar.phone and 'formatted_phone_number' in place_details:
-                        bar.phone = place_details['formatted_phone_number']
-                    
-                    bar.save()
-                    
-                    # Update the data in our results list
-                    bar_data['hours'] = bar.hours
-                    bar_data['website'] = bar.website
-                    bar_data['phone'] = bar.phone
-                    
-                except Exception as e:
-                    logger.error(f"Error updating bar details: {str(e)}")
-        
-    def calculate_distance(self, lat1, lon1, lat2, lon2):
-        """Calculate distance between two points using Haversine formula"""
-        # Radius of the Earth in meters
-        R = 6371000
-        
-        # Convert coordinates to radians
-        lat1_rad = radians(lat1)
-        lon1_rad = radians(lon1)
-        lat2_rad = radians(lat2)
-        lon2_rad = radians(lon2)
-        
-        # Differences
-        dlon = lon2_rad - lon1_rad
-        dlat = lat2_rad - lat1_rad
-        
-        # Haversine formula
-        a = sin(dlat/2)**2 + cos(lat1_rad) * cos(lat2_rad) * sin(dlon/2)**2
-        c = 2 * atan2(sqrt(a), sqrt(1-a))
-        distance = R * c
-        
-        return distance
+
+# Wait Time Views
 
 class WaitTimeViewSet(viewsets.ModelViewSet):
-    """ViewSet for reporting and retrieving bar wait times"""
+    """
+    ViewSet for reporting and retrieving bar wait times.
+    
+    Integrates with Best Time API to provide wait time estimates for bars.
+    """
     queryset = WaitTime.objects.all()
     serializer_class = WaitTimeSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -447,100 +358,67 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         """
-        Override list method to fetch wait times from the external "best time" API
-        and return them in the response.
+        Override list method to fetch wait times from the Best Time API.
+        
+        Args:
+            request: HTTP request with 'bar' query parameter
+            
+        Returns:
+            Response: Current wait time in minutes
         """
         bar_id = request.query_params.get('bar')
         if not bar_id:
             return Response({"error": "Bar ID is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Fetch the bar instance by ID
             bar = Bar.objects.get(pk=bar_id)
         except Bar.DoesNotExist:
             return Response({"error": "Bar not found"}, status=status.HTTP_404_NOT_FOUND)
 
         try:
+            service = WaitTimeService()
+            venue_id = service.create_forecast(bar)
+            busyness_pct = service.get_current_busyness(venue_id)
+            wait_time = service.convert_percentage_to_minutes(busyness_pct)
+
             wait_time_data = {
                 "bar": {
                     "id": bar_id,
                     "name": bar.name,
                     "address": bar.address
                 },
+                "wait_time": wait_time
             }
 
-            venue_id = self.create_besttime_forecast(bar)
-            wait_time_data['venue_id'] = venue_id
-            hour_raw = self.fetch_current_busyness_pct(wait_time_data['venue_id'])
-            wait_time_data['current_wait_time'] = self.pct_to_minutes(hour_raw)
-
-            # logger.debug(f"Wait time data: {wait_time_data}")
-
-            return Response([wait_time_data['current_wait_time']], status=status.HTTP_200_OK)
+            logger.debug(f"Wait time data: {wait_time_data}")
+            return Response([wait_time], status=status.HTTP_200_OK)
+            
         except Exception as e:
+            logger.error(f"Error fetching wait time: {str(e)}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-    def create_besttime_forecast(self, bar):
-        """
-        Create a new forecast for the given bar using the "best time" API and
-        return the new venue ID.
-        
-        :param bar: The Bar instance to create a forecast for
-        :return: The venue ID returned by the "best time" API
-        """
-        url = "https://besttime.app/api/v1/forecasts"
-        resp = requests.post(url, params={
-            'api_key_private': settings.BEST_TIME_API_KEY_PRIVATE,
-            'venue_name':    bar.name,
-            'venue_address': bar.address,
-        })
-        resp.raise_for_status()
-        data = resp.json()
-        return data['venue_info']['venue_id']
-    
-    def fetch_current_busyness_pct(self, venue_id):
-        """
-        Fetch the current busyness percentage for a given venue using the "best time" API.
 
-        :param venue_id: The ID of the venue for which to fetch the current busyness percentage.
-        :return: An integer representing the current busyness percentage (0-100).
-        :raises: HTTPError if the request to the API fails.
-        """
-        url = "https://besttime.app/api/v1/forecasts/now/raw"
-        resp = requests.get(url, params={
-            'api_key_public': settings.BEST_TIME_API_KEY_PUBLIC,
-            'venue_id':       venue_id,
-        })
-        resp.raise_for_status()
-        return resp.json()['analysis']['hour_raw']   # e.g. 0–100
-    
-    @staticmethod
-    def pct_to_minutes(pct, max_wait=60):
-        return round(pct/100 * max_wait)
-
-
-
-    
-
-#------------------------------------------------------
 # Favorites Views
-#------------------------------------------------------
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_favorites(request):
     """
     Get all favorite bars for the current user.
-    Returns serialized bar data for favorited bars.
+    
+    Args:
+        request: HTTP request with authentication
+        
+    Returns:
+        Response: Serialized favorite bar data
     """
     try:
-        favorites = Favorite.objects.filter(user=request.user)
+        favorites = Favorite.objects.filter(user=request.user).select_related('bar')
         favorite_bars = [favorite.bar for favorite in favorites]
         serializer = BarSerializer(favorite_bars, many=True)
         return Response(serializer.data)
     
     except Exception as e:
-        logging.error(f"Error fetching favorites: {str(e)}")
+        logger.error(f"Error fetching favorites: {str(e)}")
         return Response(
             {"error": "Failed to load favorites."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -549,12 +427,21 @@ def get_favorites(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def toggle_favorite(request, bar_id):
-    """Toggle a bar as favorite/unfavorite for the current user"""
+    """
+    Toggle a bar as favorite/unfavorite for the current user.
+    
+    Args:
+        request: HTTP request with authentication
+        bar_id (int): ID of the bar to toggle
+        
+    Returns:
+        Response: Status message indicating favorited or unfavorited
+    """
     try:
         bar = Bar.objects.get(pk=bar_id)
         favorite, created = Favorite.objects.get_or_create(user=request.user, bar=bar)
         
-        if not created:  # If it existed already, then remove it
+        if not created:
             favorite.delete()
             return Response({"status": "unfavorited"})
         
