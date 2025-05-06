@@ -86,7 +86,7 @@ const BarDetail = () => {
             {waitTimes[0] > 0 ? (
               <span>{waitTimes[0]} minutes</span>
             ) : (
-              <span>Bar is Currently Closed</span>
+              <span>No Wait Time Available</span>
             )}
           </div>
         </div>

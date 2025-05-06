@@ -290,6 +290,8 @@ class BarViewSet(viewsets.ModelViewSet):
             address = place_details.get('formatted_address', '')
             phone = place_details.get('formatted_phone_number', '')
             website = place_details.get('website', '')
+            is_open = place_details.get('opening_hours', {}).get('open_now', False)
+            # logger.debug(f"Place is open: {is_open}")
             
             hours_data = place_details.get('opening_hours', {}).get('periods', [])
             if hours_data:
@@ -310,9 +312,7 @@ class BarViewSet(viewsets.ModelViewSet):
                         if 'open' in cleaned_period:
                             cleaned_hours.append(cleaned_period)
                 
-                hours = json.dumps(cleaned_hours) 
-            else:
-                hours = None
+                hours = json.dumps(cleaned_hours)
             
             price_level = place_details.get('price_level')
             rating = place_details.get('rating')
@@ -331,7 +331,8 @@ class BarViewSet(viewsets.ModelViewSet):
                 hours=hours,
                 price_level=price_level,
                 rating=rating,
-                type=types
+                type=types,
+                is_open=is_open
             )
             new_bar.save()
             
@@ -373,28 +374,29 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
         try:
             bar = Bar.objects.get(pk=bar_id)
         except Bar.DoesNotExist:
-            return Response({[0]}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Bar not found"}, status=status.HTTP_404_NOT_FOUND)
 
         try:
-            if not bar.is_open_now():
-                return Response({"Bar is currently closed"}, status=status.HTTP_200_OK)
-            else:
-                service = WaitTimeService()
-                venue_id = service.create_forecast(bar)
-                busyness_pct = service.get_current_busyness(venue_id)
-                wait_time = service.convert_percentage_to_minutes(busyness_pct)
+            # logger.debug(f"Bar is open? {bar.is_open}")
+            # if not bar.is_open:
+            #     return Response({0}, status=status.HTTP_200_OK)
+            # else:
+            service = WaitTimeService()
+            venue_id = service.create_forecast(bar)
+            busyness_pct = service.get_current_busyness(venue_id)
+            wait_time = service.convert_percentage_to_minutes(busyness_pct)
 
-                wait_time_data = {
-                    "bar": {
-                        "id": bar_id,
-                        "name": bar.name,
-                        "address": bar.address
-                    },
-                    "wait_time": wait_time
-                }
+            wait_time_data = {
+                "bar": {
+                    "id": bar_id,
+                    "name": bar.name,
+                    "address": bar.address
+                },
+                "wait_time": wait_time
+            }
 
-                logger.debug(f"Wait time data: {wait_time_data}")
-                return Response([wait_time], status=status.HTTP_200_OK)
+            logger.debug(f"Wait time data: {wait_time_data}")
+            return Response([wait_time], status=status.HTTP_200_OK)
                 
         except Exception as e:
             logger.error(f"Error fetching wait time: {str(e)}")
