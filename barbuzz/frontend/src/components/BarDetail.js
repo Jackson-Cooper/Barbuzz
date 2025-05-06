@@ -40,7 +40,7 @@ const BarDetail = () => {
 
   const formattedHours = groupHours(bar.hours);
   const imageUrl = bar.photo_reference
-    ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${bar.photo_reference}&key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}`
+    ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${bar.photo_reference}&key=${process.env.GOOGLE_MAPS_API_KEY}`
     : null;
 
   return (
@@ -95,7 +95,7 @@ const BarDetail = () => {
       </div>
       
       <div className="flex justify-center">
-        <Link to="/search" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
+        <Link to="/search" className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
           Back to Search
         </Link>
       </div>
