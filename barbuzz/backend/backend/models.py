@@ -125,6 +125,7 @@ class WaitTime(models.Model):
 
 class UserProfile(models.Model):
     user = models.OneToOneField(get_user_model(), on_delete=models.CASCADE)
+    is_over_21 = models.BooleanField(default=False, help_text="Whether the user is 21+")
 
     def __str__(self):
         return self.user.username

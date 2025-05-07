@@ -12,11 +12,20 @@ const AuthForm = ({ mode }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { login: authLogin } = useAuth();
+  const [isOver21, setIsOver21] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    // setLoading(true);
     setError('');
+
+    // For registration, check age verification
+    if (mode != 'login' && !isOver21) {
+      setError('You must be 21 or older to use BarBuzz');
+      return;
+    }
+
+    setLoading(true);
 
     try {
       if (mode === 'login') {
@@ -61,6 +70,27 @@ const AuthForm = ({ mode }) => {
           )}
           
           <form onSubmit={handleSubmit} className="space-y-6">
+          {mode != 'login' && (
+            <div className="p-4 rounded-lg border-2 border-electricBlue bg-deepNavy mb-4">
+              <h3 className="text-electricBlue text-lg font-semibold mb-2">Age Verification</h3>
+              <div className="flex items-start space-x-2">
+                <input
+                  type="checkbox"
+                  id="isOver21"
+                  checked={isOver21}
+                  onChange={(e) => setIsOver21(e.target.checked)}
+                  className="mt-1"
+                />
+                <label htmlFor="isOver21" className="text-offWhite">
+                  I confirm that I am 21 years of age or older
+                  <span className="block text-magenta text-sm mt-1">
+                    * You must be 21+ to use BarBuzz
+                  </span>
+                </label>
+              </div>
+            </div>
+          )}
+
             <div>
               <label htmlFor="username" className="block text-offWhite text-lg mb-2">
                 Username

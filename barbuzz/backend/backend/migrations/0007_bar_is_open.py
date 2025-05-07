@@ -9,10 +9,10 @@ class Migration(migrations.Migration):
         ('backend', '0006_alter_bar_photo_reference'),
     ]
 
-    operations = [
-        migrations.AddField(
-            model_name='bar',
-            name='is_open',
-            field=models.BooleanField(default=False, help_text='Is the bar currently open?'),
-        ),
-    ]
+    # operations = [
+    #     migrations.AddField(
+    #         model_name='bar',
+    #         name='is_open',
+    #         field=models.BooleanField(default=False, help_text='Is the bar currently open?'),
+    #     ),
+    # ]

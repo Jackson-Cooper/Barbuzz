@@ -9,6 +9,8 @@ import logging
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
 from django.conf import settings
+from django.db import transaction
+
 
 from rest_framework import viewsets, permissions, status, serializers
 from rest_framework.response import Response
@@ -48,22 +50,61 @@ class UserRegistrationAPIView(APIView):
     API endpoint for user registration.
     """
     permission_classes = [AllowAny]
-    
     def post(self, request):
-        """
-        Register a new user.
-        
-        Args:
-            request: HTTP request containing user data
+        try:
+            # Extract data from request
+            username = request.data.get('username')
+            email = request.data.get('email')
+            password = request.data.get('password')
             
-        Returns:
-            Response: Success message or validation errors
-        """
-        serializer = UserRegistrationSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            return Response({"message": "User created successfully"}, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            # Basic validation
+            if not username or not email or not password:
+                return Response({
+                    'error': 'Username, email, and password are required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if user exists
+            if User.objects.filter(username=username).exists():
+                return Response({
+                    'error': 'Username already exists'
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+            if User.objects.filter(email=email).exists():
+                return Response({
+                    'error': 'Email already exists'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Use atomic transaction to ensure consistency
+            with transaction.atomic():
+                # Create user
+                user = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    password=password
+                )
+                
+                # Create user profile
+                # Use get_or_create to handle the case where a profile might already exist
+                profile, created = UserProfile.objects.get_or_create(
+                    user=user,
+                    defaults={'is_over_21': True}
+                )
+                
+                if not created:
+                    # If a profile already exists, update it
+                    profile.is_over_21 = True
+                    profile.save()
+            
+            return Response({
+                'success': 'User registered successfully',
+                'username': username
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Error in registration: {str(e)}")
+            return Response({
+                'error': f'Registration failed: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
