@@ -39,13 +39,7 @@ const BarDetail = () => {
             setApiLimitError(false);
           } catch (err) {
             if (err.message === 'API call limit reached') {
-              const cachedWaitTimes = getCachedData(`waitTimes_${barId}`);
-              if (cachedWaitTimes) {
-                setApiLimitError(false);
-              } else {
-                setApiLimitError(true);
-              }
-            } else {
+              setApiLimitError(true);
               setWaitTimes([]);
             }
           }
