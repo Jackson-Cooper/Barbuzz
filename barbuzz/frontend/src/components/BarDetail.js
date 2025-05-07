@@ -11,6 +11,7 @@ const BarDetail = () => {
   const [waitTimes, setWaitTimes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [apiLimitError, setApiLimitError] = useState(false);
   const { isAuthenticated } = useAuth();
 
   useEffect(() => {
@@ -35,8 +36,13 @@ const BarDetail = () => {
             const waitTimesResponse = await fetchWaitTimes(barId);
             setWaitTimes(waitTimesResponse.data);
             setCachedData(`waitTimes_${barId}`, waitTimesResponse.data);
+            setApiLimitError(false);
           } catch (err) {
-            setWaitTimes([]);
+            if (err.message === 'API call limit reached') {
+              setApiLimitError(true);
+            } else {
+              setWaitTimes([]);
+            }
           }
         }
 
@@ -61,6 +67,17 @@ const BarDetail = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-charcoal rounded shadow-md text-center">
+      {apiLimitError && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-4 py-2 rounded shadow-md z-50">
+          Wait Time request limit reached. Please try again later.
+          <button
+            className="ml-4 bg-white text-red-600 px-2 rounded"
+            onClick={() => setApiLimitError(false)}
+          >
+            Close
+          </button>
+        </div>
+      )}
       {imageUrl && (
         <div className="flex justify-center mb-6">
           <img
