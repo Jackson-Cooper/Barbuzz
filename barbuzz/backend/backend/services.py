@@ -7,6 +7,7 @@ import logging
 import requests
 import googlemaps
 from django.conf import settings
+from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +31,14 @@ class PlacesService:
         Returns:
             dict: Place details
         """
+        cache_key = f"place_details_{place_id}"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return cached_data
         try:
-            return self.client.place(place_id=place_id).get('result', {})
+            data = self.client.place(place_id=place_id).get('result', {})
+            cache.set(cache_key, data, timeout=600)  # Cache for 10 minutes
+            return data
         except Exception as e:
             logger.error(f"Error fetching place details: {str(e)}")
             return {}
@@ -53,22 +60,14 @@ class WaitTimeService:
             str: Venue ID from Best Time API or None if not found
         """
         url = "https://besttime.app/api/v1/forecasts"
-        try:
-            resp = requests.post(url, params={
-                'api_key_private': settings.BEST_TIME_API_KEY_PRIVATE,
-                'venue_name': bar.name,
-                'venue_address': bar.address,
-            })
-            resp.raise_for_status()
-            data = resp.json()
-            return data['venue_info']['venue_id']
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 404:
-                # Venue not found in Best Time API
-                logger.warning(f"Venue not found in Best Time API: {bar.name} at {bar.address}")
-                return None
-            else:
-                raise
+        resp = requests.post(url, params={
+            'api_key_private': settings.BEST_TIME_API_KEY_PRIVATE,
+            'venue_name': bar.name,
+            'venue_address': bar.address,
+        })
+        resp.raise_for_status()
+        data = resp.json()
+        return data['venue_info']['venue_id']
     
     @staticmethod
     def get_current_busyness(venue_id):
@@ -81,16 +80,24 @@ class WaitTimeService:
         Returns:
             float: Current busyness percentage
         """
+        cache_key = f"busyness_{venue_id}"
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            logger.info(f"Cache hit for busyness data for venue_id: {venue_id}")
+            return cached_data
+        logger.info(f"Cache miss for busyness data for venue_id: {venue_id}. Fetching from API.")
         url = "https://besttime.app/api/v1/forecasts/now/raw"
         resp = requests.get(url, params={
             'api_key_public': settings.BEST_TIME_API_KEY_PUBLIC,
             'venue_id': venue_id,
         })
         resp.raise_for_status()
-        return resp.json()['analysis']['hour_raw']
+        data = resp.json()['analysis']['hour_raw']
+        cache.set(cache_key, data, timeout=300)  # Cache for 5 minutes
+        return data
     
     @staticmethod
-    def convert_percentage_to_minutes(percentage, max_wait=60):
+    def convert_percentage_to_minutes(percentage, max_wait=90):
         """
         Convert busyness percentage to estimated wait time.
         

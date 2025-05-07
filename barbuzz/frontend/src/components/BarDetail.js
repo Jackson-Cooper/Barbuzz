@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { fetchBar, fetchWaitTimes } from '../services/api';
 import { useAuth } from '../auth/AuthContext';
 import { groupHours } from './HoursFormat';
+import { getCachedData, setCachedData } from '../utils/CacheUtils';
 
 const BarDetail = () => {
   const { barId } = useParams();
@@ -10,18 +11,46 @@ const BarDetail = () => {
   const [waitTimes, setWaitTimes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [apiLimitError, setApiLimitError] = useState(false);
   const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     const loadBarDetails = async () => {
       try {
         setLoading(true);
-        const barResponse = await fetchBar(barId);
-        setBar(barResponse.data);
-        
-        const waitTimesResponse = await fetchWaitTimes(barId);
-        setWaitTimes(waitTimesResponse.data);
-        
+
+        const cachedBar = getCachedData(`bar_${barId}`);
+        if (cachedBar) {
+          setBar(cachedBar);
+        } else {
+          const barResponse = await fetchBar(barId);
+          setBar(barResponse.data);
+          setCachedData(`bar_${barId}`, barResponse.data);
+        }
+
+        const cachedWaitTimes = getCachedData(`waitTimes_${barId}`);
+        if (cachedWaitTimes) {
+          setWaitTimes(cachedWaitTimes);
+        } else {
+          try {
+            const waitTimesResponse = await fetchWaitTimes(barId);
+            setWaitTimes(waitTimesResponse.data);
+            setCachedData(`waitTimes_${barId}`, waitTimesResponse.data);
+            setApiLimitError(false);
+          } catch (err) {
+            if (err.message === 'API call limit reached') {
+              const cachedWaitTimes = getCachedData(`waitTimes_${barId}`);
+              if (cachedWaitTimes) {
+                setApiLimitError(false);
+              } else {
+                setApiLimitError(true);
+              }
+            } else {
+              setWaitTimes([]);
+            }
+          }
+        }
+
         setError(null);
       } catch (err) {
         console.error('Error loading bar details:', err);
@@ -43,6 +72,17 @@ const BarDetail = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-charcoal rounded shadow-md text-center">
+      {apiLimitError && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-4 py-2 rounded shadow-md z-50">
+          Wait Time request limit reached. Please try again later.
+          <button
+            className="ml-4 bg-white text-red-600 px-2 rounded"
+            onClick={() => setApiLimitError(false)}
+          >
+            Close
+          </button>
+        </div>
+      )}
       {imageUrl && (
         <div className="flex justify-center mb-6">
           <img

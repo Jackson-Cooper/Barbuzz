@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { canMakeApiCall } from '../utils/ThrottleUtils';
 import { getAuthToken } from '../auth/AuthContext';
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000/api';
@@ -23,6 +24,10 @@ export const login = (credentials) => {
 };
 
 export const fetchWaitTimes = (barId) => {
+  if (!canMakeApiCall()) {
+    console.warn('API call limit reached. Please try again later.');
+    return Promise.reject(new Error('API call limit reached'));
+  }
   return api.get('/wait-times/', { params: { bar: barId } });
 };
 
@@ -37,7 +42,7 @@ export const fetchBars = async (params = {}) => {
     const response = await api.get('/bars/', { params });
     
     // Log response for debugging
-    console.log('API response:', response.data);
+    // console.log('API response:', response.data);
     
     return response.data;
   } catch (error) {
