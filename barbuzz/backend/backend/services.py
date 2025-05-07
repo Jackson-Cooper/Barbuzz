@@ -7,6 +7,7 @@ import logging
 import requests
 import googlemaps
 from django.conf import settings
+from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +31,14 @@ class PlacesService:
         Returns:
             dict: Place details
         """
+        cache_key = f"place_details_{place_id}"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return cached_data
         try:
-            return self.client.place(place_id=place_id).get('result', {})
+            data = self.client.place(place_id=place_id).get('result', {})
+            cache.set(cache_key, data, timeout=600)  # Cache for 10 minutes
+            return data
         except Exception as e:
             logger.error(f"Error fetching place details: {str(e)}")
             return {}
@@ -82,7 +89,7 @@ class WaitTimeService:
         return resp.json()['analysis']['hour_raw']
     
     @staticmethod
-    def convert_percentage_to_minutes(percentage, max_wait=60):
+    def convert_percentage_to_minutes(percentage, max_wait=90):
         """
         Convert busyness percentage to estimated wait time.
         

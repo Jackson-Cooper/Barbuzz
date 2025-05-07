@@ -39,10 +39,10 @@ const BarCard = ({ bar, showDistance = true }) => {
         setImageLoaded(false);
         setImageError(false);
         
-        console.log(`Loading image for ${bar.name}:`, {
-          hasImage: Boolean(bar.image),
-          imageUrl: bar.image?.substring(0, 30) + '...'
-        });
+        // console.log(`Loading image for ${bar.name}:`, {
+        //   hasImage: Boolean(bar.image),
+        //   imageUrl: bar.image?.substring(0, 30) + '...'
+        // });
         
         if (bar.image) {
           setImageUrl(bar.image);

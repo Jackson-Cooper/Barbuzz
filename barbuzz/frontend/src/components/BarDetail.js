@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { fetchBar, fetchWaitTimes } from '../services/api';
 import { useAuth } from '../auth/AuthContext';
 import { groupHours } from './HoursFormat';
+import { getCachedData, setCachedData } from '../utils/CacheUtils';
 
 const BarDetail = () => {
   const { barId } = useParams();
@@ -16,18 +17,29 @@ const BarDetail = () => {
     const loadBarDetails = async () => {
       try {
         setLoading(true);
-        const barResponse = await fetchBar(barId);
-        setBar(barResponse.data);
-        
-        try {
-          const waitTimesResponse = await fetchWaitTimes(barId);
-          setWaitTimes(waitTimesResponse.data);
-        } catch (err) {
-          // console.error('Error loading wait times:', err);
-          // setting a default value if wait times are not available
-          setWaitTimes([]);
+
+        const cachedBar = getCachedData(`bar_${barId}`);
+        if (cachedBar) {
+          setBar(cachedBar);
+        } else {
+          const barResponse = await fetchBar(barId);
+          setBar(barResponse.data);
+          setCachedData(`bar_${barId}`, barResponse.data);
         }
-        
+
+        const cachedWaitTimes = getCachedData(`waitTimes_${barId}`);
+        if (cachedWaitTimes) {
+          setWaitTimes(cachedWaitTimes);
+        } else {
+          try {
+            const waitTimesResponse = await fetchWaitTimes(barId);
+            setWaitTimes(waitTimesResponse.data);
+            setCachedData(`waitTimes_${barId}`, waitTimesResponse.data);
+          } catch (err) {
+            setWaitTimes([]);
+          }
+        }
+
         setError(null);
       } catch (err) {
         console.error('Error loading bar details:', err);

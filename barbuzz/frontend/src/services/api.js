@@ -37,7 +37,7 @@ export const fetchBars = async (params = {}) => {
     const response = await api.get('/bars/', { params });
     
     // Log response for debugging
-    console.log('API response:', response.data);
+    // console.log('API response:', response.data);
     
     return response.data;
   } catch (error) {
