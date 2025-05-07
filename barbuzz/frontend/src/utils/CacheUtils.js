@@ -1,9 +1,3 @@
-/*
-    * CacheUtils.js
-    * This file contains utility functions to manage caching of API responses
-    * using sessionStorage.
-*/
-
 const CACHE_EXPIRATION_MS = 5 * 60 * 1000; // 5 minutes
 
 export const getCachedData = (key) => {
