@@ -14,7 +14,7 @@ COPY barbuzz/backend/ .
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "python manage.py migrate && gunicorn backend.wsgi:application --bind 0.0.0.0:8000"]
+CMD ["sh", "-c", "python manage.py migrate && gunicorn backend.wsgi:application --bind 0.0.0.0:8080"]
 
 # Frontend build stage
 FROM node:18 as frontend-build
