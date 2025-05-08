@@ -2,10 +2,12 @@ FROM python:3.13.1
 
 WORKDIR /app
 
-COPY barbuzz/backend/requirements.txt .
-RUN pip install -r requirements.txt
+# Copy and install requirements
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY barbuzz/backend/ .
+# Copy project code
+COPY . .
 
 EXPOSE 8080
 
