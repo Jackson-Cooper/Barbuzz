@@ -61,7 +61,9 @@ const BarDetail = () => {
   if (error) return <div className="text-center text-red-500 py-10">{error}</div>;
   if (!bar) return <div className="text-center text-gray-300 py-10">Bar not found</div>;
 
-  const formattedHours = groupHours(bar.hours);
+  const formattedHours = bar && bar.hours && Array.isArray(bar.hours) 
+    ? groupHours(bar.hours) 
+    : [];
   const imageUrl = bar.image;
 
   return (
