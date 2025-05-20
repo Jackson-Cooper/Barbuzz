@@ -28,8 +28,7 @@ SECRET_KEY = 'your-secret-key-here'
 DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"
 
 
-# ALLOWED_HOSTS = ['0.0.0.0', 'localhost', '127.0.0.1']
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 
 # Application definition
@@ -124,7 +123,7 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME', 'barbuzz'),
+        'NAME': os.environ.get('DB_NAME', 'db'),
         'USER': os.environ.get('DB_USER', 'postgres'),
         'PASSWORD': os.environ.get('DB_PASSWORD', 'postgres'),
         'HOST': os.environ.get('DB_HOST', 'db'),
@@ -229,6 +228,9 @@ load_dotenv()
 GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY")
 BEST_TIME_API_KEY_PRIVATE = os.environ.get("BEST_TIME_API_KEY_PRIVATE")
 BEST_TIME_API_KEY_PUBLIC = os.environ.get("BEST_TIME_API_KEY_PUBLIC")
+
+# API URL prefix for routing (set to 'api' or '' depending on environment)
+# API_URL_PREFIX = os.environ.get("API_URL_PREFIX", "api")
 
 LOGGING = {
     'version': 1,
