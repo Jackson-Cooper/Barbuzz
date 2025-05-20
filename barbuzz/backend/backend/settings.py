@@ -230,7 +230,7 @@ BEST_TIME_API_KEY_PRIVATE = os.environ.get("BEST_TIME_API_KEY_PRIVATE")
 BEST_TIME_API_KEY_PUBLIC = os.environ.get("BEST_TIME_API_KEY_PUBLIC")
 
 # API URL prefix for routing (set to 'api' or '' depending on environment)
-API_URL_PREFIX = os.environ.get("API_URL_PREFIX", "api")
+# API_URL_PREFIX = os.environ.get("API_URL_PREFIX", "api")
 
 LOGGING = {
     'version': 1,
