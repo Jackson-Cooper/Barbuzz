@@ -158,7 +158,7 @@ trio-websocket==0.12.2
 Twisted==24.11.0
 txaio==23.1.1
 types-PyYAML==6.0.12.20250326
-typing-inspection==0.4.0
+typing-inspection==0.4.1
 typing_extensions==4.12.2
 tzdata==2025.2
 uritemplate==4.1.1
