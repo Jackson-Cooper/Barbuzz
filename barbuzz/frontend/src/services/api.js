@@ -3,6 +3,7 @@ import { canMakeApiCall } from '../utils/ThrottleUtils';
 import { getAuthToken } from '../auth/AuthContext';
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000/api';
+console.log("API_BASE", API_BASE);
 
 const api = axios.create({
   baseURL: API_BASE,
