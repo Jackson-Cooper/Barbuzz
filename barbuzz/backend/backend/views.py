@@ -234,19 +234,27 @@ class BarViewSet(viewsets.ModelViewSet):
                 lng = float(request.query_params.get('lng', 0))
                 radius = int(request.query_params.get('radius', 5000))
                 limit = int(request.query_params.get('limit', 12))
+                price_level_param = request.query_params.get('price_level')
+                rating_param = request.query_params.get('rating')
+                logger.debug(f"BarViewSet.list: Received query_params: lat={lat}, lng={lng}, radius={radius}, limit={limit}, price_level={price_level_param}, rating={rating_param}")
             except (ValueError, TypeError):
+                logger.error("BarViewSet.list: Invalid location parameters received.")
                 return Response({"error": "Invalid location parameters"}, status=400)
                 
             if lat == 0 and lng == 0:
+                logger.warning("BarViewSet.list: Location parameters (lat, lng) are zero. Aborting.")
                 return Response({"error": "Location parameters required"}, status=400)
             
             bars = Bar.objects.nearby(lat, lng, radius)
+            logger.debug(f"BarViewSet.list: Found {len(bars)} bars from Bar.objects.nearby()")
             
-            if request.query_params.get('price_level'):
-                bars = [b for b in bars if b.price_level == int(request.query_params.get('price_level'))]
+            if price_level_param:
+                bars = [b for b in bars if b.price_level == int(price_level_param)]
+                logger.debug(f"BarViewSet.list: {len(bars)} bars after price_level filter.")
                 
-            if request.query_params.get('rating'):
-                bars = [b for b in bars if b.rating and b.rating >= float(request.query_params.get('rating'))]
+            if rating_param:
+                bars = [b for b in bars if b.rating and b.rating >= float(rating_param)]
+                logger.debug(f"BarViewSet.list: {len(bars)} bars after rating filter.")
             
             bars = bars[:limit]
             
@@ -256,6 +264,7 @@ class BarViewSet(viewsets.ModelViewSet):
             for i, bar in enumerate(bars):
                 data[i]['distance'] = round(bar.distance, 1)
             
+            logger.debug(f"BarViewSet.list: Returning {len(data)} bars.")
             return Response(data)
                 
         except Exception as e:
@@ -317,8 +326,21 @@ class BarViewSet(viewsets.ModelViewSet):
             place_id = place_details.get('place_id')
             name = place_details.get('name', 'Unknown Bar')
 
-            types = place_details.get('types', [])
-            if 'bar' not in types and 'night_club' not in types:
+            # Example for the new check in create_bar_from_place_details
+            google_types = place_details.get('types', [])
+            # Ensure logger is defined: logger = logging.getLogger(__name__)
+            
+            # Convert to set for efficient lookup
+            relevant_bar_types = {'bar', 'night_club', 'pub', 'lounge'} 
+            
+            is_relevant = False
+            for t in google_types:
+                if t in relevant_bar_types:
+                    is_relevant = True
+                    break
+            
+            if not is_relevant:
+                logger.info(f"Place {place_details.get('name')} with types {google_types} is not a relevant bar type. Skipping.")
                 return None
             
             location = place_details.get('geometry', {}).get('location', {})
@@ -372,7 +394,7 @@ class BarViewSet(viewsets.ModelViewSet):
                 hours=hours,
                 price_level=price_level,
                 rating=rating,
-                type=types,
+                type=google_types, # Assign the list directly to the JSONField
                 is_open=is_open
             )
             new_bar.save()

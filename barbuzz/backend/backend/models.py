@@ -17,11 +17,20 @@ class BarManager(models.Manager):
         """
         Returns only establishments that are actual bars or nightclubs.
         """
-        return self.filter(
-            models.Q(type='bar') | 
-            models.Q(type='nightclub') | 
-            models.Q(type='bar+nightclub')
-        )
+        # Suggested implementation for get_only_bars in BarManager
+        from django.db.models import Q
+        
+        bar_types = ['bar', 'night_club', 'pub', 'lounge'] # Add other relevant types if needed
+        queries = [Q(type__contains=type_name) for type_name in bar_types]
+        
+        # Combine queries with OR
+        combined_query = Q()
+        for item_query in queries:
+            combined_query |= item_query
+        
+        filtered_queryset = self.filter(combined_query)
+        logger.debug(f"BarManager.get_only_bars: Filtering for types {bar_types}. Found {filtered_queryset.count()} bars.")
+        return filtered_queryset
     
     def search_by_query(self, query):
         """
@@ -64,6 +73,7 @@ class BarManager(models.Manager):
                 longitude__gte=lng - lng_range,
                 longitude__lte=lng + lng_range
             )
+            logger.debug(f"BarManager.nearby: Found {queryset.count()} bars within initial bounding box after type filtering.")
             
             bars_with_distance = []
             for bar in queryset:
@@ -71,12 +81,17 @@ class BarManager(models.Manager):
                 
                 # Check if bar is within radius
                 if distance <= radius_km:
+                    logger.debug(f"BarManager.nearby: Bar '{bar.name}' (ID: {bar.id}) at {distance:.2f}km is WITHIN radius {radius_km}km.")
                     # Store distance in miles for display
                     bar.distance = distance * 0.621371  
                     bars_with_distance.append(bar)
+                else:
+                    logger.debug(f"BarManager.nearby: Bar '{bar.name}' (ID: {bar.id}) at {distance:.2f}km is OUTSIDE radius {radius_km}km.")
             
             # Sort bars by distance
-            return sorted(bars_with_distance, key=lambda x: x.distance)
+            sorted_bars = sorted(bars_with_distance, key=lambda x: x.distance)
+            logger.debug(f"BarManager.nearby: Returning {len(sorted_bars)} bars after distance and radius check.")
+            return sorted_bars
             
         except Exception as e:
             logger.error(f"Error in nearby calculation: {str(e)}")
@@ -96,7 +111,7 @@ class Bar(models.Model):
     photo_reference = models.CharField(max_length=1000, blank=True, help_text="Reference token for retrieving a photo via Google Places API")
     price_level = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Price level from 0 (free) to 4 (very expensive)")
     rating = models.DecimalField(max_digits=3, decimal_places=2, null=True, blank=True, help_text="Average rating from Google (e.g., 4.3)")
-    type = models.CharField(max_length=50, default='bar')
+    type = models.JSONField(default=list, blank=True)
     is_open = models.BooleanField(default=False, help_text="Is the bar currently open?")
 
     created_at = models.DateTimeField(auto_now_add=True, null=True)
