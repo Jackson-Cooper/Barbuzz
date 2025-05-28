@@ -67,14 +67,16 @@ MIDDLEWARE = [
 ]
 
 # Add these settings (temporarily for debugging)
-CORS_ORIGIN_ALLOW_ALL = True  # Allow all origins
-CORS_ALLOW_ALL_ORIGINS = True  # Alternative way to allow all origins
-CORS_ALLOW_CREDENTIALS = True
+# CORS_ORIGIN_ALLOW_ALL = True  # Allow all origins
+CORS_ALLOW_ALL_ORIGINS = False
 
-# CORS_ALLOWED_ORIGINS = [
-#     'http://localhost:3000',  
-#     'http://127.0.0.1:3000', 
-# ]
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:3000',  
+    'http://127.0.0.1:3000',
+    'https://barbuzz.live',
+    'https://www.barbuzz.live',
+    'https://barbuzz.jacksoncooperportfolio.me'
+]
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
