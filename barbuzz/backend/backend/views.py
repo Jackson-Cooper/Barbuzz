@@ -248,6 +248,11 @@ class BarViewSet(viewsets.ModelViewSet):
                     address=item.get('vicinity', item.get('formatted_address', '')),
                     latitude=loc.get('lat'),
                     longitude=loc.get('lng'),
+                    photo_reference=(
+                        item.get('photos', [{}])[0].get('photo_reference')
+                        if item.get('photos')
+                        else None
+                    ),
                     price_level=item.get('price_level'),
                     rating=item.get('rating'),
                 )
@@ -296,6 +301,11 @@ class BarViewSet(viewsets.ModelViewSet):
                     address=item.get('formatted_address', ''),
                     latitude=loc.get('lat'),
                     longitude=loc.get('lng'),
+                    photo_reference=(
+                        item.get('photos', [{}])[0].get('photo_reference')
+                        if item.get('photos')
+                        else None
+                    ),
                     price_level=item.get('price_level'),
                     rating=item.get('rating'),
                 )
@@ -343,6 +353,12 @@ class BarViewSet(viewsets.ModelViewSet):
             website = place_details.get('website', '')
             is_open = place_details.get('opening_hours', {}).get('open_now', False)
             # logger.debug(f"Place is open: {is_open}")
+
+            photo_reference = (
+                place_details.get('photos', [{}])[0].get('photo_reference')
+                if place_details.get('photos')
+                else None
+            )
             
             hours_data = place_details.get('opening_hours', {}).get('periods', [])
             if hours_data:
@@ -378,6 +394,7 @@ class BarViewSet(viewsets.ModelViewSet):
                 longitude=longitude,
                 phone_number=phone,
                 website=website,
+                photo_reference=photo_reference,
                 hours=hours,
                 price_level=price_level,
                 rating=rating,
