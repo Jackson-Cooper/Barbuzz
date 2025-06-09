@@ -231,6 +231,24 @@ GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY")
 BEST_TIME_API_KEY_PRIVATE = os.environ.get("BEST_TIME_API_KEY_PRIVATE")
 BEST_TIME_API_KEY_PUBLIC = os.environ.get("BEST_TIME_API_KEY_PUBLIC")
 
+# Caching configuration
+if DEBUG:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": os.environ.get("REDIS_URL", "redis://redis:6379/1"),
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            },
+        }
+    }
+
 # API URL prefix for routing (set to 'api' or '' depending on environment)
 # API_URL_PREFIX = os.environ.get("API_URL_PREFIX", "api")
 

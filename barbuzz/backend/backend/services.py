@@ -2,7 +2,6 @@
 Service classes for external API interactions.
 """
 
-import json
 import logging
 import requests
 import googlemaps
@@ -20,6 +19,38 @@ class PlacesService:
         """Initialize the service with Google Maps API client."""
         logger.debug("Initializing PlacesService with Google Maps API key: {settings.GOOGLE_MAPS_API_KEY}")
         self.client = googlemaps.Client(key=settings.GOOGLE_MAPS_API_KEY)
+
+    def search_nearby(self, lat, lng, radius=5000, limit=12):
+        """Search for bars near a location with caching."""
+        cache_key = f"nearby_{lat}_{lng}_{radius}_{limit}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            resp = self.client.places_nearby(
+                location=(lat, lng), radius=radius, type="bar"
+            )
+            results = resp.get("results", [])[:limit]
+            cache.set(cache_key, results, timeout=900)
+            return results
+        except Exception as e:
+            logger.error(f"Error fetching nearby bars: {e}")
+            return []
+
+    def search_text(self, query, limit=12):
+        """Search for bars by text using Google Places."""
+        cache_key = f"text_{query}_{limit}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            resp = self.client.places(query=query, type="bar")
+            results = resp.get("results", [])[:limit]
+            cache.set(cache_key, results, timeout=900)
+            return results
+        except Exception as e:
+            logger.error(f"Error fetching bars by text: {e}")
+            return []
     
     def get_place_details(self, place_id):
         """
