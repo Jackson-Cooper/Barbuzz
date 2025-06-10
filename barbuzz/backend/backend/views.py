@@ -449,7 +449,15 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
             # else:
             service = WaitTimeService()
             venue_id = service.create_forecast(bar)
+            if not venue_id:
+                logger.error("Failed to obtain venue_id for bar %s", bar_id)
+                return Response({"error": "Unable to fetch wait time"}, status=500)
+
             busyness_pct = service.get_current_busyness(venue_id)
+            if busyness_pct is None:
+                logger.error("Failed to fetch busyness for venue_id %s", venue_id)
+                return Response({"error": "Unable to fetch wait time"}, status=500)
+
             wait_time = service.convert_percentage_to_minutes(busyness_pct)
 
             wait_time_data = {
@@ -462,6 +470,7 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
             }
 
             logger.debug(f"Wait time data: {wait_time_data}")
+            logger.info("Successfully fetched wait time for bar %s", bar_id)
             return Response([wait_time], status=status.HTTP_200_OK)
                 
         except Exception as e:
