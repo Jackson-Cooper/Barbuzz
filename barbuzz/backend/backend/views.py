@@ -7,8 +7,6 @@ organized by functionality: Authentication, User Management, Bar Data, and Favor
 
 import logging
 from django.contrib.auth.models import User
-from django.shortcuts import get_object_or_404
-from django.conf import settings
 from django.db import transaction
 
 
@@ -25,8 +23,7 @@ from .models import Bar, Favorite, WaitTime, UserProfile
 from .serializers import (
     BarSerializer, 
     WaitTimeSerializer, 
-    UserProfileSerializer, 
-    UserRegistrationSerializer
+    UserProfileSerializer
 )
 from .utils import haversine_distance
 from .services import PlacesService, WaitTimeService
@@ -240,22 +237,34 @@ class BarViewSet(viewsets.ModelViewSet):
             if lat == 0 and lng == 0:
                 return Response({"error": "Location parameters required"}, status=400)
             
-            bars = Bar.objects.nearby(lat, lng, radius)
-            
-            if request.query_params.get('price_level'):
-                bars = [b for b in bars if b.price_level == int(request.query_params.get('price_level'))]
-                
-            if request.query_params.get('rating'):
-                bars = [b for b in bars if b.rating and b.rating >= float(request.query_params.get('rating'))]
-            
-            bars = bars[:limit]
-            
+            service = PlacesService()
+            results = service.search_nearby(lat, lng, radius, limit)
+            bars = []
+            for item in results:
+                loc = item.get('geometry', {}).get('location', {})
+                bar = Bar(
+                    place_id=item.get('place_id'),
+                    name=item.get('name', ''),
+                    address=item.get('vicinity', item.get('formatted_address', '')),
+                    latitude=loc.get('lat'),
+                    longitude=loc.get('lng'),
+                    photo_reference=(
+                        item.get('photos', [{}])[0].get('photo_reference')
+                        if item.get('photos')
+                        else None
+                    ),
+                    price_level=item.get('price_level'),
+                    rating=item.get('rating'),
+                )
+                distance = haversine_distance(lat, lng, bar.latitude, bar.longitude)
+                bar.distance = distance * 0.621371
+                bars.append(bar)
+
             serializer = self.get_serializer(bars, many=True)
             data = serializer.data
-            
             for i, bar in enumerate(bars):
                 data[i]['distance'] = round(bar.distance, 1)
-            
+
             return Response(data)
                 
         except Exception as e:
@@ -281,16 +290,27 @@ class BarViewSet(viewsets.ModelViewSet):
             except (ValueError, TypeError):
                 limit = 12
             
-            bars = Bar.objects.search_by_query(query)
-            
-            if request.query_params.get('price_level'):
-                bars = bars.filter(price_level=int(request.query_params.get('price_level')))
-                
-            if request.query_params.get('rating'):
-                bars = bars.filter(rating__gte=float(request.query_params.get('rating')))
-            
-            bars = bars[:limit]
-            
+            service = PlacesService()
+            results = service.search_text(query, limit)
+            bars = []
+            for item in results:
+                loc = item.get('geometry', {}).get('location', {})
+                bar = Bar(
+                    place_id=item.get('place_id'),
+                    name=item.get('name', ''),
+                    address=item.get('formatted_address', ''),
+                    latitude=loc.get('lat'),
+                    longitude=loc.get('lng'),
+                    photo_reference=(
+                        item.get('photos', [{}])[0].get('photo_reference')
+                        if item.get('photos')
+                        else None
+                    ),
+                    price_level=item.get('price_level'),
+                    rating=item.get('rating'),
+                )
+                bars.append(bar)
+
             serializer = self.get_serializer(bars, many=True)
             return Response(serializer.data)
             
@@ -333,6 +353,12 @@ class BarViewSet(viewsets.ModelViewSet):
             website = place_details.get('website', '')
             is_open = place_details.get('opening_hours', {}).get('open_now', False)
             # logger.debug(f"Place is open: {is_open}")
+
+            photo_reference = (
+                place_details.get('photos', [{}])[0].get('photo_reference')
+                if place_details.get('photos')
+                else None
+            )
             
             hours_data = place_details.get('opening_hours', {}).get('periods', [])
             if hours_data:
@@ -368,14 +394,13 @@ class BarViewSet(viewsets.ModelViewSet):
                 longitude=longitude,
                 phone_number=phone,
                 website=website,
-                # photo_reference=photo_reference,
+                photo_reference=photo_reference,
                 hours=hours,
                 price_level=price_level,
                 rating=rating,
                 type=types,
-                is_open=is_open
+                is_open=is_open,
             )
-            new_bar.save()
             
             bar_data = BarSerializer(new_bar).data
             bar_data['distance'] = round(distance / 1609, 1)  
@@ -424,7 +449,15 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
             # else:
             service = WaitTimeService()
             venue_id = service.create_forecast(bar)
+            if not venue_id:
+                logger.error("Failed to obtain venue_id for bar %s", bar_id)
+                return Response({"error": "Unable to fetch wait time"}, status=500)
+
             busyness_pct = service.get_current_busyness(venue_id)
+            if busyness_pct is None:
+                logger.error("Failed to fetch busyness for venue_id %s", venue_id)
+                return Response({"error": "Unable to fetch wait time"}, status=500)
+
             wait_time = service.convert_percentage_to_minutes(busyness_pct)
 
             wait_time_data = {
@@ -437,6 +470,7 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
             }
 
             logger.debug(f"Wait time data: {wait_time_data}")
+            logger.info("Successfully fetched wait time for bar %s", bar_id)
             return Response([wait_time], status=status.HTTP_200_OK)
                 
         except Exception as e:
