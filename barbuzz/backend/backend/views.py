@@ -202,6 +202,32 @@ class BarViewSet(viewsets.ModelViewSet):
     serializer_class = BarSerializer
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = (TokenAuthentication,)
+    lookup_field = "place_id"
+
+    def retrieve(self, request, *args, **kwargs):
+        place_id = kwargs.get(self.lookup_field)
+        try:
+            bar = self.get_queryset().get(place_id=place_id)
+            serializer = self.get_serializer(bar)
+            return Response(serializer.data)
+        except Bar.DoesNotExist:
+            service = PlacesService()
+            details = service.get_place_details(place_id)
+            if not details:
+                return Response({"error": "Bar not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            lat = request.query_params.get("lat")
+            lng = request.query_params.get("lng")
+            try:
+                origin_lat = float(lat) if lat is not None else 0
+                origin_lng = float(lng) if lng is not None else 0
+            except (ValueError, TypeError):
+                origin_lat = origin_lng = 0
+
+            bar_data = self.create_bar_from_place_details(details, origin_lat, origin_lng)
+            if not bar_data:
+                return Response({"error": "Bar not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(bar_data)
     
     def list(self, request):
         """

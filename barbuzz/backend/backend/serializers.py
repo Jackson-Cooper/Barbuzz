@@ -72,6 +72,13 @@ class BarSerializer(serializers.ModelSerializer):
             return f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference={obj.photo_reference}&key={api_key}"
         return None
 
+    def to_representation(self, instance):
+        """Ensure the `id` field is populated for unsaved bars."""
+        data = super().to_representation(instance)
+        if data.get("id") is None:
+            data["id"] = data.get("place_id")
+        return data
+
 class WaitTimeSerializer(serializers.ModelSerializer):
     """
     Serializer for wait time data reported by users.

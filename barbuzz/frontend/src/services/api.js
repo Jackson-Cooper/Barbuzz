@@ -64,8 +64,9 @@ export const getCurrentUser = () => {
   return api.get('/auth/user/');
 };
 
-export const fetchBar = (barId) => {
-  return api.get(`/bars/${barId}/`);
+// Fetch a bar by its Google place ID (used as `id` in API responses)
+export const fetchBar = (placeId) => {
+  return api.get(`/bars/${placeId}/`);
 };
 
 export const getUserProfile = async () => {
