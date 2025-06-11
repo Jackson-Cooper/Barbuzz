@@ -19,6 +19,6 @@ urlpatterns = [
     path(f'api/auth/user/', views.get_current_user, name='current_user'),
     path(f'api/user-profiles/me/', views.get_user_profile, name='my_profile'),
     path(f'api/favorites/', views.get_favorites, name='favorites'),
-    path(f'api/favorites/<int:bar_id>/toggle/', views.toggle_favorite, name='toggle_favorite'),
+    path(f'api/favorites/<str:bar_id>/toggle/', views.toggle_favorite, name='toggle_favorite'),
     path(f'api/', include(router.urls)),
 ]

@@ -430,6 +430,7 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
         
         Args:
             request: HTTP request with 'bar' query parameter
+            bar (str): Google place ID of the bar
             
         Returns:
             Response: Current wait time in minutes
@@ -439,7 +440,7 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
             return Response({"error": "Bar ID is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            bar = Bar.objects.get(pk=bar_id)
+            bar = Bar.objects.get(place_id=bar_id)
         except Bar.DoesNotExist:
             return Response({"error": "Bar not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -504,13 +505,13 @@ def toggle_favorite(request, bar_id):
     
     Args:
         request: HTTP request with authentication
-        bar_id (int): ID of the bar to toggle
+        bar_id (str): Google place ID of the bar to toggle
         
     Returns:
         Response: Status message indicating favorited or unfavorited
     """
     try:
-        bar = Bar.objects.get(pk=bar_id)
+        bar = Bar.objects.get(place_id=bar_id)
         favorite, created = Favorite.objects.get_or_create(user=request.user, bar=bar)
         
         if not created:

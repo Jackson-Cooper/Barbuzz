@@ -73,10 +73,9 @@ class BarSerializer(serializers.ModelSerializer):
         return None
 
     def to_representation(self, instance):
-        """Ensure the `id` field is populated for unsaved bars."""
+        """Expose the Google place ID as the primary identifier."""
         data = super().to_representation(instance)
-        if data.get("id") is None:
-            data["id"] = data.get("place_id")
+        data["id"] = data.get("place_id") or data.get("id")
         return data
 
 class WaitTimeSerializer(serializers.ModelSerializer):
