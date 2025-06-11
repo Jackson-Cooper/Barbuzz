@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { fetchBar, fetchWaitTimes } from '../services/api';
 import { useAuth } from '../auth/AuthContext';
+import { formatHoursDisplay } from '../utils/barUtils';
 import { groupHours } from './HoursFormat';
 import { getCachedData, setCachedData } from '../utils/CacheUtils';
 
@@ -60,10 +61,9 @@ const BarDetail = () => {
   if (loading) return <div className="text-center text-gray-300 py-10">Loading bar details...</div>;
   if (error) return <div className="text-center text-red-500 py-10">{error}</div>;
   if (!bar) return <div className="text-center text-gray-300 py-10">Bar not found</div>;
-
-  const formattedHours = bar && bar.hours && Array.isArray(bar.hours) 
-    ? groupHours(bar.hours) 
-    : [];
+ 
+  // refactor barUtils and rm hoursFormat.js
+  const formattedHours = groupHours(formatHoursDisplay(bar.hours));
   const imageUrl = bar.image;
 
   return (
@@ -122,7 +122,7 @@ const BarDetail = () => {
             {waitTimes[0] > 0 ? (
               <span>{waitTimes[0]} minutes</span>
             ) : (
-              <span>No Wait Time Available</span>
+              <span>0 Minutes</span>
             )}
           </div>
         </div>

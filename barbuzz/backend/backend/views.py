@@ -266,15 +266,38 @@ class BarViewSet(viewsets.ModelViewSet):
             if lat == 0 and lng == 0:
                 return Response({"error": "Location parameters required"}, status=400)
             
-            bars = Bar.objects.nearby(lat, lng, radius)
-            
-            if request.query_params.get('price_level'):
-                bars = [b for b in bars if b.price_level == int(request.query_params.get('price_level'))]
+            # bars = Bar.objects.nearby(lat, lng, radius)
+    
+            # if request.query_params.get('price_level'):
+            #     bars = [b for b in bars if b.price_level == int(request.query_params.get('price_level'))]
                 
-            if request.query_params.get('rating'):
-                bars = [b for b in bars if b.rating and b.rating >= float(request.query_params.get('rating'))]
+            # if request.query_params.get('rating'):
+            #     bars = [b for b in bars if b.rating and b.rating >= float(request.query_params.get('rating'))]
             
-            bars = bars[:limit]
+            # bars = bars[:limit]
+
+            service = PlacesService()
+            results = service.search_nearby(lat, lng, radius, limit)
+            bars = []
+            for item in results:
+                loc = item.get('geometry', {}).get('location', {})
+                bar = Bar(
+                    place_id=item.get('place_id'),
+                    name=item.get('name', ''),
+                    address=item.get('vicinity', item.get('formatted_address', '')),
+                    latitude=loc.get('lat'),
+                    longitude=loc.get('lng'),
+                    photo_reference=(
+                        item.get('photos', [{}])[0].get('photo_reference')
+                        if item.get('photos')
+                        else None
+                    ),
+                    price_level=item.get('price_level'),
+                    rating=item.get('rating'),
+                )
+                distance = haversine_distance(lat, lng, bar.latitude, bar.longitude)
+                bar.distance = distance * 0.621371
+                bars.append(bar)
             
             serializer = self.get_serializer(bars, many=True)
             data = serializer.data
@@ -307,15 +330,26 @@ class BarViewSet(viewsets.ModelViewSet):
             except (ValueError, TypeError):
                 limit = 12
             
-            bars = Bar.objects.search_by_query(query)
-            
-            if request.query_params.get('price_level'):
-                bars = bars.filter(price_level=int(request.query_params.get('price_level')))
-                
-            if request.query_params.get('rating'):
-                bars = bars.filter(rating__gte=float(request.query_params.get('rating')))
-            
-            bars = bars[:limit]
+            service = PlacesService()
+            results = service.search_text(query, limit)
+            bars = []
+            for item in results:
+                loc = item.get('geometry', {}).get('location', {})
+                bar = Bar(
+                    place_id=item.get('place_id'),
+                    name=item.get('name', ''),
+                    address=item.get('formatted_address', ''),
+                    latitude=loc.get('lat'),
+                    longitude=loc.get('lng'),
+                    photo_reference=(
+                        item.get('photos', [{}])[0].get('photo_reference')
+                        if item.get('photos')
+                        else None
+                    ),
+                    price_level=item.get('price_level'),
+                    rating=item.get('rating'),
+                )
+                bars.append(bar)
             
             serializer = self.get_serializer(bars, many=True)
             return Response(serializer.data)
@@ -383,6 +417,9 @@ class BarViewSet(viewsets.ModelViewSet):
             
             price_level = place_details.get('price_level')
             rating = place_details.get('rating')
+            photo_reference = None
+            if place_details.get('photos'):
+                photo_reference = place_details['photos'][0].get('photo_reference')
             
             distance = haversine_distance(origin_lat, origin_lng, latitude, longitude)
             
@@ -394,14 +431,16 @@ class BarViewSet(viewsets.ModelViewSet):
                 longitude=longitude,
                 phone_number=phone,
                 website=website,
-                # photo_reference=photo_reference,
+                photo_reference=photo_reference,
                 hours=hours,
                 price_level=price_level,
                 rating=rating,
                 type=types,
                 is_open=is_open
             )
-            new_bar.save()
+
+            # saves to db
+            # new_bar.save()
             
             bar_data = BarSerializer(new_bar).data
             bar_data['distance'] = round(distance / 1609, 1)  
