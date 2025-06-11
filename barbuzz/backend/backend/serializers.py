@@ -72,6 +72,12 @@ class BarSerializer(serializers.ModelSerializer):
             return f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference={obj.photo_reference}&key={api_key}"
         return None
 
+    def to_representation(self, instance):
+        """Expose the Google place ID as the primary identifier."""
+        data = super().to_representation(instance)
+        data["id"] = data.get("place_id") or data.get("id")
+        return data
+
 class WaitTimeSerializer(serializers.ModelSerializer):
     """
     Serializer for wait time data reported by users.

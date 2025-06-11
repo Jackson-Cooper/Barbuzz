@@ -199,6 +199,32 @@ class BarViewSet(viewsets.ModelViewSet):
     serializer_class = BarSerializer
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = (TokenAuthentication,)
+    lookup_field = "place_id"
+
+    def retrieve(self, request, *args, **kwargs):
+        place_id = kwargs.get(self.lookup_field)
+        try:
+            bar = self.get_queryset().get(place_id=place_id)
+            serializer = self.get_serializer(bar)
+            return Response(serializer.data)
+        except Bar.DoesNotExist:
+            service = PlacesService()
+            details = service.get_place_details(place_id)
+            if not details:
+                return Response({"error": "Bar not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            lat = request.query_params.get("lat")
+            lng = request.query_params.get("lng")
+            try:
+                origin_lat = float(lat) if lat is not None else 0
+                origin_lng = float(lng) if lng is not None else 0
+            except (ValueError, TypeError):
+                origin_lat = origin_lng = 0
+
+            bar_data = self.create_bar_from_place_details(details, origin_lat, origin_lng)
+            if not bar_data:
+                return Response({"error": "Bar not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(bar_data)
     
     def list(self, request):
         """
@@ -429,6 +455,7 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
         
         Args:
             request: HTTP request with 'bar' query parameter
+            bar (str): Google place ID of the bar
             
         Returns:
             Response: Current wait time in minutes
@@ -438,7 +465,7 @@ class WaitTimeViewSet(viewsets.ModelViewSet):
             return Response({"error": "Bar ID is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            bar = Bar.objects.get(pk=bar_id)
+            bar = Bar.objects.get(place_id=bar_id)
         except Bar.DoesNotExist:
             return Response({"error": "Bar not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -512,13 +539,13 @@ def toggle_favorite(request, bar_id):
     
     Args:
         request: HTTP request with authentication
-        bar_id (int): ID of the bar to toggle
+        bar_id (str): Google place ID of the bar to toggle
         
     Returns:
         Response: Status message indicating favorited or unfavorited
     """
     try:
-        bar = Bar.objects.get(pk=bar_id)
+        bar = Bar.objects.get(place_id=bar_id)
         favorite, created = Favorite.objects.get_or_create(user=request.user, bar=bar)
         
         if not created:
